@@ -1,0 +1,6 @@
+[toolchain]
+# Anchor 0.30.x IDL generation (anchor-syn) expects a stable proc-macro2 / rustc pairing;
+# host toolchains newer than ~1.79 often break `Span::source_file` during `idl-build`.
+channel = "1.79.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"
