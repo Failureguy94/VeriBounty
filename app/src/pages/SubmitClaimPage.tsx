@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useWallet, useAnchorWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { submitClaim } from '../lib/mockBlockchain';
+import { submitClaim } from '../lib/blockchain';
 import toast from 'react-hot-toast';
-import { FileText, Coins, Tag, ChevronDown, CheckCircle2, AlertCircle } from 'lucide-react';
+import { FileText, Coins, Tag, ChevronDown, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
 
 const CATEGORIES = ['Technology', 'Health', 'Finance', 'Policy', 'Science', 'Politics', 'Environment', 'Other'];
 
@@ -18,6 +18,7 @@ interface FormData {
 
 const SubmitClaimPage = () => {
   const { connected } = useWallet();
+  const anchorWallet = useAnchorWallet();
   const navigate = useNavigate();
 
   const [form, setForm] = useState<FormData>({
@@ -28,7 +29,11 @@ const SubmitClaimPage = () => {
     tags: '',
   });
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState<{ txSignature: string; bountyId: string } | null>(null);
+  const [success, setSuccess] = useState<{
+    txSignature: string;
+    bountyId: string;
+    bountyPda: string;
+  } | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -38,7 +43,7 @@ const SubmitClaimPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!connected) {
+    if (!connected || !anchorWallet) {
       toast.error('Please connect your wallet first');
       return;
     }
@@ -58,50 +63,77 @@ const SubmitClaimPage = () => {
     }
 
     setLoading(true);
-    const toastId = toast.loading('Submitting claim to blockchain...');
+    const toastId = toast.loading('Requesting wallet approval…');
 
     try {
       const result = await submitClaim({
-        claim: form.claim.trim(),
+        wallet:      anchorWallet,
+        claim:       form.claim.trim(),
         description: form.description.trim(),
         stakeAmount: stake,
-        category: form.category,
-        tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
+        category:    form.category,
+        tags:        form.tags.split(',').map(t => t.trim()).filter(Boolean),
       });
 
-      toast.success('Claim submitted successfully!', { id: toastId });
+      toast.success('Bounty created & SOL locked on-chain! 🎉', { id: toastId });
       setSuccess(result);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Transaction failed', { id: toastId });
+      const msg = err instanceof Error ? err.message : 'Transaction failed';
+      // Surface user-friendly message for common Anchor errors
+      if (msg.includes('0x1')) {
+        toast.error('Insufficient SOL balance', { id: toastId });
+      } else if (msg.includes('User rejected')) {
+        toast.error('Transaction cancelled', { id: toastId });
+      } else {
+        toast.error(msg, { id: toastId });
+      }
     } finally {
       setLoading(false);
     }
   };
 
   if (success) {
+    const explorerUrl = `https://explorer.solana.com/tx/${success.txSignature}?cluster=devnet`;
     return (
       <div className="flex-1 flex items-center justify-center px-4 py-16">
         <div className="card max-w-md w-full text-center animate-fadeInUp">
           <div className="w-16 h-16 rounded-full bg-success/15 border border-success/30 flex items-center justify-center mx-auto mb-5">
             <CheckCircle2 size={32} className="text-success" />
           </div>
-          <h2 className="text-2xl font-bold text-textPrimary mb-2">Claim Submitted!</h2>
-          <p className="text-textSecondary mb-6">Your bounty is now live on the Solana blockchain.</p>
+          <h2 className="text-2xl font-bold text-textPrimary mb-1">Bounty Created!</h2>
+          <p className="text-textSecondary mb-6 text-sm">
+            SOL has been locked in the escrow vault on Solana Devnet.
+          </p>
 
           <div className="bg-surfaceLight rounded-lg p-4 mb-6 text-left space-y-3">
             <div>
+              <span className="label">Bounty PDA</span>
+              <code className="text-primary font-mono text-xs break-all">{success.bountyPda}</code>
+            </div>
+            <div>
               <span className="label">Bounty ID</span>
-              <code className="text-primary font-mono text-sm">#{success.bountyId}</code>
+              <code className="text-accentLight font-mono text-sm">{success.bountyId}</code>
             </div>
             <div>
               <span className="label">Transaction</span>
-              <code className="text-accentLight font-mono text-xs break-all">{success.txSignature}</code>
+              <a
+                href={explorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-accent hover:text-accentLight text-xs font-mono break-all transition-colors"
+              >
+                {success.txSignature.slice(0, 32)}…
+                <ExternalLink size={11} />
+              </a>
             </div>
           </div>
 
           <div className="flex gap-3">
             <button
-              onClick={() => { setSuccess(null); setForm({ claim: '', description: '', stakeAmount: '', category: 'Technology', tags: '' }); }}
+              onClick={() => {
+                setSuccess(null);
+                setForm({ claim: '', description: '', stakeAmount: '', category: 'Technology', tags: '' });
+              }}
               className="btn-secondary flex-1"
             >
               Submit Another
@@ -121,7 +153,7 @@ const SubmitClaimPage = () => {
       <div className="mb-8">
         <h1 className="text-3xl font-extrabold text-textPrimary mb-2">Submit a Claim</h1>
         <p className="text-textSecondary">
-          Stake SOL to open a fact-checking bounty. Fact-checkers will investigate and earn a share of the stake.
+          Stake <strong>real SOL</strong> to open a fact-checking bounty on Solana Devnet. Fact-checkers investigate and earn rewards.
         </p>
       </div>
 
@@ -131,7 +163,7 @@ const SubmitClaimPage = () => {
           <AlertCircle size={20} className="text-warning flex-shrink-0" />
           <div className="flex-1">
             <p className="text-sm text-textPrimary font-medium">Wallet not connected</p>
-            <p className="text-xs text-textSecondary">Connect your Solana wallet to submit a claim</p>
+            <p className="text-xs text-textSecondary">Connect your Solana wallet to submit a claim and stake SOL</p>
           </div>
           <WalletMultiButton />
         </div>
@@ -170,7 +202,7 @@ const SubmitClaimPage = () => {
             onChange={handleChange}
             rows={4}
             className="input-field resize-none"
-            placeholder="Provide context about where this claim appeared, why it's important to verify, and any related information..."
+            placeholder="Provide context about where this claim appeared, why it's important to verify..."
             maxLength={1000}
           />
           <div className="flex justify-between mt-1">
@@ -208,11 +240,11 @@ const SubmitClaimPage = () => {
               value={form.stakeAmount}
               onChange={handleChange}
               className="input-field"
-              placeholder="e.g. 2.5"
+              placeholder="e.g. 0.1"
               min="0.1"
-              step="0.1"
+              step="0.01"
             />
-            <span className="text-xs text-textSecondary mt-1 block">Min 0.1 SOL</span>
+            <span className="text-xs text-textSecondary mt-1 block">Min 0.1 SOL • Locked in escrow</span>
           </div>
         </div>
 
@@ -234,16 +266,15 @@ const SubmitClaimPage = () => {
         {/* Bounty preview */}
         {(form.stakeAmount || form.claim) && (
           <div className="bg-surfaceLight rounded-lg p-4 border border-border/40 text-sm space-y-2">
-            <p className="text-textSecondary font-medium text-xs uppercase tracking-wider mb-2">Bounty Preview</p>
+            <p className="text-textSecondary font-medium text-xs uppercase tracking-wider mb-2">Transaction Preview</p>
             {form.stakeAmount && parseFloat(form.stakeAmount) > 0 && (
               <p className="text-textSecondary">
-                Stake: <span className="text-primary font-bold">{form.stakeAmount} SOL</span>
+                You will stake: <span className="text-primary font-bold">{form.stakeAmount} SOL</span>
+                {' '}→ locked in escrow PDA
               </p>
             )}
-            <p className="text-textSecondary">
-              Fact-checkers earn up to <span className="text-success font-semibold">
-                {form.stakeAmount ? (parseFloat(form.stakeAmount) * 0.7).toFixed(2) : '—'} SOL
-              </span> for a verified verdict
+            <p className="text-textSecondary text-xs">
+              A Solana wallet approval dialog will appear. Once confirmed, SOL is transferred to the program escrow on Devnet.
             </p>
           </div>
         )}
@@ -251,18 +282,19 @@ const SubmitClaimPage = () => {
         {/* Submit */}
         <button
           type="submit"
+          id="submit-claim-btn"
           className="btn-primary w-full flex items-center justify-center gap-2 py-3 text-base"
           disabled={loading || !connected}
         >
           {loading ? (
             <>
               <span className="w-4 h-4 border-2 border-background/40 border-t-background rounded-full animate-spin" />
-              Submitting...
+              Waiting for wallet…
             </>
           ) : (
             <>
               <Coins size={16} />
-              Submit & Stake SOL
+              Submit & Stake SOL On-Chain
             </>
           )}
         </button>

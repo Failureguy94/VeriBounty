@@ -73,7 +73,7 @@ const BountyCard = ({ bounty, index = 0 }: Props) => {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5 text-primary">
             <Coins size={14} />
-            <span className="text-sm font-bold">{bounty.stakeAmount} SOL</span>
+            <span className="text-sm font-bold">{bounty.stakeAmount.toFixed(4)} SOL</span>
           </div>
           <div className="flex items-center gap-1.5 text-textSecondary">
             <Users size={13} />

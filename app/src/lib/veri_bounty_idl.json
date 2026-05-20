@@ -1,0 +1,650 @@
+{
+  "address": "8xmwE6esqnwxKMGrdszEiBEKnA6PjZNSsh6ByKZxC8Za",
+  "metadata": {
+    "name": "veri_bounty",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Solana escrow bounty program (Anchor)"
+  },
+  "instructions": [
+    {
+      "name": "claim_bounty",
+      "discriminator": [
+        225,
+        157,
+        163,
+        238,
+        239,
+        169,
+        75,
+        226
+      ],
+      "accounts": [
+        {
+          "name": "fact_checker",
+          "signer": true
+        },
+        {
+          "name": "bounty",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  117,
+                  110,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty.submitter",
+                "account": "Bounty"
+              },
+              {
+                "kind": "account",
+                "path": "bounty.bounty_id",
+                "account": "Bounty"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_bounty",
+      "discriminator": [
+        122,
+        90,
+        14,
+        143,
+        8,
+        125,
+        200,
+        2
+      ],
+      "accounts": [
+        {
+          "name": "submitter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "bounty",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  117,
+                  110,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "submitter"
+              },
+              {
+                "kind": "arg",
+                "path": "bounty_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "bounty_id",
+          "type": "u64"
+        },
+        {
+          "name": "stake_lamports",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "resolve_bounty",
+      "discriminator": [
+        207,
+        43,
+        93,
+        238,
+        222,
+        184,
+        79,
+        219
+      ],
+      "accounts": [
+        {
+          "name": "resolver",
+          "writable": true,
+          "signer": true,
+          "address": "3GkUrSgQpdSFVg7xmc5Zfe6SDQV61GE757VKCMfZ4K48"
+        },
+        {
+          "name": "bounty",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  117,
+                  110,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty.submitter",
+                "account": "Bounty"
+              },
+              {
+                "kind": "account",
+                "path": "bounty.bounty_id",
+                "account": "Bounty"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty"
+              }
+            ]
+          }
+        },
+        {
+          "name": "submitter",
+          "writable": true
+        },
+        {
+          "name": "fact_checker",
+          "writable": true
+        },
+        {
+          "name": "reputation",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "resolution",
+          "type": {
+            "defined": {
+              "name": "Resolution"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "submit_verdict",
+      "discriminator": [
+        138,
+        102,
+        56,
+        22,
+        229,
+        130,
+        105,
+        118
+      ],
+      "accounts": [
+        {
+          "name": "fact_checker",
+          "signer": true
+        },
+        {
+          "name": "bounty",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  117,
+                  110,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty.submitter",
+                "account": "Bounty"
+              },
+              {
+                "kind": "account",
+                "path": "bounty.bounty_id",
+                "account": "Bounty"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "verdict",
+          "type": "bool"
+        },
+        {
+          "name": "evidence_ipfs_hash",
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Bounty",
+      "discriminator": [
+        237,
+        16,
+        105,
+        198,
+        19,
+        69,
+        242,
+        234
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "BountyClaimed",
+      "discriminator": [
+        140,
+        202,
+        21,
+        51,
+        211,
+        65,
+        142,
+        21
+      ]
+    },
+    {
+      "name": "BountyCreated",
+      "discriminator": [
+        68,
+        252,
+        247,
+        196,
+        154,
+        247,
+        130,
+        49
+      ]
+    },
+    {
+      "name": "BountyResolved",
+      "discriminator": [
+        250,
+        202,
+        221,
+        27,
+        55,
+        88,
+        103,
+        137
+      ]
+    },
+    {
+      "name": "VerdictSubmitted",
+      "discriminator": [
+        152,
+        183,
+        133,
+        217,
+        208,
+        91,
+        243,
+        209
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidStakeAmount",
+      "msg": "Stake amount must be greater than zero"
+    },
+    {
+      "code": 6001,
+      "name": "BountyNotOpen",
+      "msg": "Bounty is not open for claiming"
+    },
+    {
+      "code": 6002,
+      "name": "CannotClaimOwnBounty",
+      "msg": "Submitter cannot claim their own bounty"
+    },
+    {
+      "code": 6003,
+      "name": "BountyNotClaimed",
+      "msg": "Bounty must be claimed before verdict submission"
+    },
+    {
+      "code": 6004,
+      "name": "UnauthorizedClaimant",
+      "msg": "Only the claiming fact-checker can submit the verdict"
+    },
+    {
+      "code": 6005,
+      "name": "EvidenceHashTooLong",
+      "msg": "Evidence IPFS hash exceeds maximum length"
+    },
+    {
+      "code": 6006,
+      "name": "BountyNotReadyForResolution",
+      "msg": "Bounty is not ready for resolution"
+    },
+    {
+      "code": 6007,
+      "name": "UnauthorizedResolver",
+      "msg": "Only the trusted resolver can resolve bounties"
+    },
+    {
+      "code": 6008,
+      "name": "InsufficientEscrowBalance",
+      "msg": "Escrow vault does not hold enough lamports"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidSubmitterAccount",
+      "msg": "Submitter account does not match bounty submitter"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidFactCheckerAccount",
+      "msg": "Fact-checker account does not match bounty claimant"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidReputationPda",
+      "msg": "Invalid reputation PDA for fact-checker"
+    },
+    {
+      "code": 6012,
+      "name": "ReputationAccountInvalid",
+      "msg": "Invalid or corrupted reputation account"
+    },
+    {
+      "code": 6013,
+      "name": "MathOverflow",
+      "msg": "Math overflow"
+    }
+  ],
+  "types": [
+    {
+      "name": "Bounty",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "submitter",
+            "type": "pubkey"
+          },
+          {
+            "name": "bounty_id",
+            "type": "u64"
+          },
+          {
+            "name": "stake_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "fact_checker",
+            "type": "pubkey"
+          },
+          {
+            "name": "submitted_verdict",
+            "type": {
+              "option": "bool"
+            }
+          },
+          {
+            "name": "evidence_ipfs_hash",
+            "type": "string"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "BountyStatus"
+              }
+            }
+          },
+          {
+            "name": "resolution",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "Resolution"
+                }
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vault_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BountyClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bounty",
+            "type": "pubkey"
+          },
+          {
+            "name": "fact_checker",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BountyCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bounty",
+            "type": "pubkey"
+          },
+          {
+            "name": "submitter",
+            "type": "pubkey"
+          },
+          {
+            "name": "bounty_id",
+            "type": "u64"
+          },
+          {
+            "name": "stake_lamports",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BountyResolved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bounty",
+            "type": "pubkey"
+          },
+          {
+            "name": "resolver",
+            "type": "pubkey"
+          },
+          {
+            "name": "resolution",
+            "type": {
+              "defined": {
+                "name": "Resolution"
+              }
+            }
+          },
+          {
+            "name": "payout_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "fact_checker",
+            "type": "pubkey"
+          },
+          {
+            "name": "submitter",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BountyStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Claimed"
+          },
+          {
+            "name": "VerdictSubmitted"
+          },
+          {
+            "name": "Resolved"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Resolution",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Accepted"
+          },
+          {
+            "name": "Rejected"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VerdictSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bounty",
+            "type": "pubkey"
+          },
+          {
+            "name": "fact_checker",
+            "type": "pubkey"
+          },
+          {
+            "name": "verdict",
+            "type": "bool"
+          },
+          {
+            "name": "evidence_ipfs_hash",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,40 +1,44 @@
 import { useEffect, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { fetchUserProfile } from '../lib/mockBlockchain';
+import { fetchUserProfile } from '../lib/blockchain';
 import { UserProfile } from '../types';
 import {
-  TrendingUp,
-  Shield,
-  Award,
-  Coins,
-  Star,
-  CheckCircle2,
-  BarChart2,
-  Calendar,
+  TrendingUp, Shield, Award, Coins, Star,
+  CheckCircle2, BarChart2, Calendar, RefreshCw, ExternalLink,
 } from 'lucide-react';
 
 const MyProfilePage = () => {
   const { connected, publicKey } = useWallet();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (connected) {
-      setLoading(true);
-      fetchUserProfile(publicKey?.toBase58()).then(p => {
-        setProfile(p);
-        setLoading(false);
-      });
-    }
-  }, [connected, publicKey]);
+  const [error, setError] = useState<string | null>(null);
 
   const walletDisplay = publicKey
     ? `${publicKey.toBase58().slice(0, 6)}...${publicKey.toBase58().slice(-4)}`
     : '—';
 
+  const loadProfile = () => {
+    if (!connected || !publicKey) return;
+    setLoading(true);
+    setError(null);
+    fetchUserProfile(publicKey.toBase58())
+      .then(p => { setProfile(p); setLoading(false); })
+      .catch(err => {
+        console.error(err);
+        setError('Failed to load on-chain data. Make sure you are on Devnet.');
+        setLoading(false);
+      });
+  };
+
+  useEffect(() => { loadProfile(); }, [connected, publicKey]);
+
   const formatDate = (ts: number) =>
     new Date(ts).toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+
+  const explorerUrl = publicKey
+    ? `https://explorer.solana.com/address/${publicKey.toBase58()}?cluster=devnet`
+    : '#';
 
   if (!connected) {
     return (
@@ -45,7 +49,7 @@ const MyProfilePage = () => {
           </div>
           <h2 className="text-xl font-bold text-textPrimary mb-2">Connect Your Wallet</h2>
           <p className="text-textSecondary text-sm mb-6">
-            Connect your Solana wallet to view your profile, reputation, and bounty history.
+            Connect your Solana wallet to view your on-chain reputation, staking history, and earned rewards.
           </p>
           <WalletMultiButton />
         </div>
@@ -67,6 +71,22 @@ const MyProfilePage = () => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-surfaceLight rounded-xl" />)}
           </div>
+          <p className="text-textSecondary text-sm text-center mt-4">Fetching on-chain data from Devnet…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex-1 flex items-center justify-center px-4 py-20">
+        <div className="card max-w-sm w-full text-center">
+          <div className="text-4xl mb-4">⚠️</div>
+          <h2 className="text-lg font-bold text-textPrimary mb-2">Could not load profile</h2>
+          <p className="text-textSecondary text-sm mb-4">{error}</p>
+          <button onClick={loadProfile} className="btn-primary flex items-center gap-2 mx-auto">
+            <RefreshCw size={14} /> Retry
+          </button>
         </div>
       </div>
     );
@@ -74,9 +94,9 @@ const MyProfilePage = () => {
 
   const statCards = [
     { label: 'Reputation Score', value: profile.reputationScore.toLocaleString(), icon: Star, color: 'text-primary' },
-    { label: 'Total Staked', value: `${profile.totalStaked} SOL`, icon: Coins, color: 'text-accent' },
-    { label: 'Total Earned', value: `${profile.totalEarned} SOL`, icon: TrendingUp, color: 'text-success' },
-    { label: 'Success Rate', value: `${profile.successRate}%`, icon: BarChart2, color: 'text-warning' },
+    { label: 'SOL Balance',      value: `${profile.solBalance} SOL`,              icon: Coins, color: 'text-accent' },
+    { label: 'Total Earned',     value: `${profile.totalEarned} SOL`,             icon: TrendingUp, color: 'text-success' },
+    { label: 'Success Rate',     value: `${profile.successRate}%`,                icon: BarChart2, color: 'text-warning' },
   ];
 
   return (
@@ -86,36 +106,51 @@ const MyProfilePage = () => {
         <div className="flex items-center gap-5 mb-5">
           <div className="w-16 h-16 rounded-full bg-gold-gradient flex items-center justify-center shadow-glow-gold flex-shrink-0">
             <span className="text-2xl font-extrabold text-background">
-              {profile.username.charAt(0)}
+              {walletDisplay.charAt(0).toUpperCase()}
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold text-textPrimary">{profile.username}</h1>
-            <code className="text-accentLight font-mono text-sm">{walletDisplay}</code>
+            <h1 className="text-xl font-bold text-textPrimary font-mono">{walletDisplay}</h1>
+            <a
+              href={explorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accentLight text-xs hover:text-accent transition-colors inline-flex items-center gap-1 mt-0.5"
+            >
+              View on Explorer <ExternalLink size={10} />
+            </a>
             <div className="flex items-center gap-1.5 mt-1 text-textSecondary text-xs">
               <Calendar size={12} />
-              Member since {formatDate(profile.joinedAt)}
+              Live on Solana Devnet
             </div>
           </div>
-          <div className="hidden sm:flex flex-col items-end">
+          <div className="hidden sm:flex flex-col items-end gap-1">
             <div className="text-3xl font-extrabold text-primary">{profile.reputationScore}</div>
-            <div className="text-textSecondary text-xs">Reputation</div>
+            <div className="text-textSecondary text-xs">Rep Score</div>
+            <button
+              onClick={loadProfile}
+              className="text-xs text-textSecondary hover:text-textPrimary transition-colors flex items-center gap-1 mt-1"
+            >
+              <RefreshCw size={10} /> Refresh
+            </button>
           </div>
         </div>
 
-        {/* Progress bar */}
-        <div>
-          <div className="flex justify-between text-xs text-textSecondary mb-1.5">
-            <span>Success Rate</span>
-            <span className="font-medium text-textPrimary">{profile.successRate}%</span>
+        {/* Success rate bar */}
+        {profile.bountiesResolved + profile.bountiesSubmitted > 0 && (
+          <div>
+            <div className="flex justify-between text-xs text-textSecondary mb-1.5">
+              <span>Success Rate</span>
+              <span className="font-medium text-textPrimary">{profile.successRate}%</span>
+            </div>
+            <div className="h-2 bg-surfaceLight rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gold-gradient rounded-full transition-all duration-700"
+                style={{ width: `${profile.successRate}%` }}
+              />
+            </div>
           </div>
-          <div className="h-2 bg-surfaceLight rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gold-gradient rounded-full transition-all duration-700"
-              style={{ width: `${profile.successRate}%` }}
-            />
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Stats grid */}
@@ -137,15 +172,17 @@ const MyProfilePage = () => {
             <h3 className="text-sm font-semibold text-textPrimary">Bounties Submitted</h3>
           </div>
           <div className="text-3xl font-extrabold text-textPrimary">{profile.bountiesSubmitted}</div>
-          <div className="text-textSecondary text-xs mt-1">Claims opened on-chain</div>
+          <div className="text-textSecondary text-xs mt-1">
+            Total: {profile.totalStaked} SOL staked
+          </div>
         </div>
         <div className="card">
           <div className="flex items-center gap-2 mb-3">
             <CheckCircle2 size={16} className="text-success" />
-            <h3 className="text-sm font-semibold text-textPrimary">Bounties Resolved</h3>
+            <h3 className="text-sm font-semibold text-textPrimary">Verdicts Resolved</h3>
           </div>
           <div className="text-3xl font-extrabold text-success">{profile.bountiesResolved}</div>
-          <div className="text-textSecondary text-xs mt-1">Claims with verified verdicts</div>
+          <div className="text-textSecondary text-xs mt-1">Accepted on-chain</div>
         </div>
       </div>
 
@@ -155,7 +192,10 @@ const MyProfilePage = () => {
           <Award size={16} className="text-primary" /> Badges ({profile.badges.length})
         </h2>
         {profile.badges.length === 0 ? (
-          <p className="text-textSecondary text-sm">No badges earned yet. Start fact-checking!</p>
+          <div className="text-center py-6">
+            <div className="text-3xl mb-2">🎯</div>
+            <p className="text-textSecondary text-sm">No badges yet. Submit or verify your first bounty!</p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {profile.badges.map(badge => (

@@ -10,7 +10,7 @@ const SEED_REPUTATION: &[u8] = b"reputation";
 
 pub const MAX_EVIDENCE_IPFS_HASH_LEN: usize = 128;
 
-// Replace with your DAO / trusted resolver wallet before deployment.
+
 pub const TRUSTED_RESOLVER: Pubkey = pubkey!("3GkUrSgQpdSFVg7xmc5Zfe6SDQV61GE757VKCMfZ4K48");
 
 #[program]

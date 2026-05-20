@@ -9,6 +9,20 @@ const claimSchema = new Schema(
       required: true,
       trim: true
     },
+    description: {
+      type: String,
+      default: "",
+      trim: true
+    },
+    category: {
+      type: String,
+      default: "Other",
+      trim: true
+    },
+    tags: {
+      type: [String],
+      default: []
+    },
     submitterWallet: {
       type: String,
       required: true,
@@ -30,6 +44,10 @@ const claimSchema = new Schema(
       type: Date,
       default: Date.now,
       immutable: true
+    },
+    expiresAt: {
+      type: Date,
+      default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
     },
     bountyPDA: {
       type: String,

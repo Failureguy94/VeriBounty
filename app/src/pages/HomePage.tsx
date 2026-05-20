@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bounty, BountyStatus } from '../types';
-import { fetchBounties } from '../lib/mockBlockchain';
+import { fetchBounties } from '../lib/blockchain';
 import BountyCard from '../components/BountyCard';
 import { Search, Filter, TrendingUp, Shield, Zap, Award } from 'lucide-react';
 
@@ -9,9 +9,9 @@ const CATEGORIES = ['All', 'Technology', 'Health', 'Finance', 'Policy', 'Science
 const STATUSES: (BountyStatus | 'all')[] = ['all', 'open', 'in-review', 'resolved', 'disputed'];
 
 const statsData = [
-  { label: 'Active Bounties', value: '127', icon: Shield, color: 'text-primary' },
-  { label: 'Total Staked', value: '1,842 SOL', icon: TrendingUp, color: 'text-accent' },
-  { label: 'Claims Verified', value: '4,391', icon: Award, color: 'text-success' },
+  { label: 'Active Bounties', value: '—', icon: Shield, color: 'text-primary' },
+  { label: 'Total Staked', value: '— SOL', icon: TrendingUp, color: 'text-accent' },
+  { label: 'Claims Verified', value: '—', icon: Award, color: 'text-success' },
   { label: 'Avg. Resolution', value: '3.2 days', icon: Zap, color: 'text-warning' },
 ];
 
@@ -24,12 +24,23 @@ const HomePage = () => {
   const [status, setStatus] = useState<BountyStatus | 'all'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'stake' | 'submissions'>('newest');
 
+  const [stats, setStats] = useState({ active: '—', staked: '—', resolved: '—' });
+
   useEffect(() => {
     fetchBounties().then(data => {
       setBounties(data);
       setFiltered(data);
       setLoading(false);
-    });
+      // Compute live stats from on-chain data
+      const active = data.filter(b => b.status === 'open' || b.status === 'in-review').length;
+      const staked = data.reduce((s, b) => s + b.stakeAmount, 0);
+      const resolved = data.filter(b => b.status === 'resolved').length;
+      setStats({
+        active: active.toString(),
+        staked: staked.toFixed(2) + ' SOL',
+        resolved: resolved.toString(),
+      });
+    }).catch(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -100,7 +111,12 @@ const HomePage = () => {
 
         {/* Stats */}
         <div className="relative max-w-5xl mx-auto mt-16 grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {statsData.map(({ label, value, icon: Icon, color }) => (
+          {[
+            { label: 'Active Bounties', value: stats.active, icon: Shield, color: 'text-primary' },
+            { label: 'Total Staked', value: stats.staked, icon: TrendingUp, color: 'text-accent' },
+            { label: 'Claims Verified', value: stats.resolved, icon: Award, color: 'text-success' },
+            { label: 'Avg. Resolution', value: '3.2 days', icon: Zap, color: 'text-warning' },
+          ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="card text-center">
               <Icon size={20} className={`${color} mx-auto mb-2`} />
               <div className={`text-2xl font-extrabold ${color} mb-0.5`}>{value}</div>

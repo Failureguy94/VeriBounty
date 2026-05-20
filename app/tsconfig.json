@@ -17,5 +17,9 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"],
+  "exclude": [
+    "src/lib/mockData.ts",
+    "src/lib/mockBlockchain.ts"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
