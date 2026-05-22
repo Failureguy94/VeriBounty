@@ -3,9 +3,12 @@ import { ClaimModel } from "../models/Claim";
 import { EvidenceModel } from "../models/Evidence";
 import { validate } from "../middleware/validate";
 import { createEvidenceBodySchema } from "../schemas/evidenceSchemas";
+import { bountyPDASchema } from "../schemas/common";
+import { z } from "zod";
 
 export const evidenceRouter = Router();
 
+// Create evidence
 evidenceRouter.post("/", validate({ body: createEvidenceBodySchema }), async (req, res, next) => {
   try {
     const payload = req.body;
@@ -28,3 +31,28 @@ evidenceRouter.post("/", validate({ body: createEvidenceBodySchema }), async (re
     next(error);
   }
 });
+
+// Get all evidence (for bulk loading in frontend)
+evidenceRouter.get("/", async (_req, res, next) => {
+  try {
+    const evidence = await EvidenceModel.find().sort({ createdAt: -1 });
+    res.status(200).json(evidence);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get evidence by bountyPDA
+evidenceRouter.get(
+  "/:bountyPDA",
+  validate({ params: z.object({ bountyPDA: bountyPDASchema }) }),
+  async (req, res, next) => {
+    try {
+      const { bountyPDA } = req.params;
+      const evidence = await EvidenceModel.find({ bountyPDA }).sort({ createdAt: -1 });
+      res.status(200).json(evidence);
+    } catch (error) {
+      next(error);
+    }
+  }
+);

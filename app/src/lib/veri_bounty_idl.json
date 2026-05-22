@@ -323,6 +323,19 @@
         242,
         234
       ]
+    },
+    {
+      "name": "UserReputation",
+      "discriminator": [
+        86,
+        95,
+        94,
+        218,
+        215,
+        219,
+        207,
+        37
+      ]
     }
   ],
   "events": [
@@ -618,6 +631,26 @@
           },
           {
             "name": "Rejected"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UserReputation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "score",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }

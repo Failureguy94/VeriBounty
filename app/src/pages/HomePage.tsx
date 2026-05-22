@@ -8,12 +8,6 @@ import { Search, Filter, TrendingUp, Shield, Zap, Award } from 'lucide-react';
 const CATEGORIES = ['All', 'Technology', 'Health', 'Finance', 'Policy', 'Science'];
 const STATUSES: (BountyStatus | 'all')[] = ['all', 'open', 'in-review', 'resolved', 'disputed'];
 
-const statsData = [
-  { label: 'Active Bounties', value: '—', icon: Shield, color: 'text-primary' },
-  { label: 'Total Staked', value: '— SOL', icon: TrendingUp, color: 'text-accent' },
-  { label: 'Claims Verified', value: '—', icon: Award, color: 'text-success' },
-  { label: 'Avg. Resolution', value: '3.2 days', icon: Zap, color: 'text-warning' },
-];
 
 const HomePage = () => {
   const [bounties, setBounties] = useState<Bounty[]>([]);
@@ -24,7 +18,7 @@ const HomePage = () => {
   const [status, setStatus] = useState<BountyStatus | 'all'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'stake' | 'submissions'>('newest');
 
-  const [stats, setStats] = useState({ active: '—', staked: '—', resolved: '—' });
+  const [stats, setStats] = useState({ active: '—', staked: '—', resolved: '—', avgResolution: '—' });
 
   useEffect(() => {
     fetchBounties().then(data => {
@@ -34,11 +28,24 @@ const HomePage = () => {
       // Compute live stats from on-chain data
       const active = data.filter(b => b.status === 'open' || b.status === 'in-review').length;
       const staked = data.reduce((s, b) => s + b.stakeAmount, 0);
-      const resolved = data.filter(b => b.status === 'resolved').length;
+      const resolvedBounties = data.filter(b => b.status === 'resolved');
+      const resolved = resolvedBounties.length;
+
+      // Compute average resolution time
+      let avgDays = '—';
+      if (resolvedBounties.length > 0) {
+        const totalDays = resolvedBounties.reduce((sum, b) => {
+          const durationMs = b.expiresAt - b.createdAt;
+          return sum + durationMs / (1000 * 60 * 60 * 24);
+        }, 0);
+        avgDays = (totalDays / resolvedBounties.length).toFixed(1) + ' days';
+      }
+
       setStats({
         active: active.toString(),
         staked: staked.toFixed(2) + ' SOL',
         resolved: resolved.toString(),
+        avgResolution: avgDays,
       });
     }).catch(() => setLoading(false));
   }, []);
@@ -115,7 +122,7 @@ const HomePage = () => {
             { label: 'Active Bounties', value: stats.active, icon: Shield, color: 'text-primary' },
             { label: 'Total Staked', value: stats.staked, icon: TrendingUp, color: 'text-accent' },
             { label: 'Claims Verified', value: stats.resolved, icon: Award, color: 'text-success' },
-            { label: 'Avg. Resolution', value: '3.2 days', icon: Zap, color: 'text-warning' },
+            { label: 'Avg. Resolution', value: stats.avgResolution, icon: Zap, color: 'text-warning' },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="card text-center">
               <Icon size={20} className={`${color} mx-auto mb-2`} />

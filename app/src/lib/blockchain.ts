@@ -47,6 +47,17 @@ interface BountyMeta {
   createdAt:       number;
 }
 
+interface BackendEvidence {
+  _id:              string;
+  bountyPDA:        string;
+  factCheckerWallet: string;
+  evidenceText:     string;
+  sourceURLs:       string[];
+  ipfsHash:         string;
+  verdict:          boolean;
+  createdAt:        string;
+}
+
 // ─── Metadata helpers ─────────────────────────────────────────────────────────
 
 async function fetchMeta(bountyPda: string): Promise<BountyMeta | null> {
@@ -88,11 +99,45 @@ async function saveMeta(meta: BountyMeta): Promise<void> {
   });
 }
 
+// ─── Evidence helpers ─────────────────────────────────────────────────────────
+
+async function fetchEvidenceByPda(bountyPda: string): Promise<BackendEvidence[]> {
+  try {
+    const res = await fetch(`${BACKEND_URL}/evidence/${bountyPda}`);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+async function fetchAllEvidence(): Promise<BackendEvidence[]> {
+  try {
+    const res = await fetch(`${BACKEND_URL}/evidence`);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+function adaptEvidence(be: BackendEvidence): import('../types').Evidence {
+  return {
+    id: be._id,
+    submitter: be.factCheckerWallet,
+    content: be.evidenceText,
+    url: be.sourceURLs?.[0],
+    timestamp: new Date(be.createdAt).getTime(),
+    upvotes: 0,
+  };
+}
+
 // ─── Adapter: OnChainBounty → Bounty ─────────────────────────────────────────
 
 function adaptBounty(
   onChain: OnChainBounty,
-  meta: BountyMeta | null
+  meta: BountyMeta | null,
+  evidenceItems: import('../types').Evidence[] = [],
 ): Bounty {
   const pda    = onChain.publicKey.toBase58();
   const acc    = onChain.account;
@@ -138,28 +183,42 @@ function adaptBounty(
     expiresAt:       meta?.expiresAt   ?? Date.now() + 30 * 24 * 60 * 60 * 1000,
     category:        meta?.category    ?? 'Other',
     tags:            meta?.tags        ?? [],
-    evidence:        [],
+    evidence:        evidenceItems,
     verdict,
-    totalSubmissions: 0,
+    totalSubmissions: evidenceItems.length,
   };
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-/** Fetch ALL on-chain bounties, enriched with off-chain metadata. */
+/** Fetch ALL on-chain bounties, enriched with off-chain metadata & evidence. */
 export async function fetchBounties(): Promise<Bounty[]> {
-  const [chainBounties, allMeta] = await Promise.all([
+  const [chainBounties, allMeta, allEvidence] = await Promise.all([
     fetchAllBounties(),
     fetchAllMeta(),
+    fetchAllEvidence(),
   ]);
 
   const metaMap = new Map<string, BountyMeta>(
     allMeta.map(m => [m.bountyPDA, m])
   );
 
-  return chainBounties.map(b =>
-    adaptBounty(b, metaMap.get(b.publicKey.toBase58()) ?? null)
-  );
+  // Group evidence by bountyPDA
+  const evidenceMap = new Map<string, import('../types').Evidence[]>();
+  for (const be of allEvidence) {
+    const key = be.bountyPDA;
+    if (!evidenceMap.has(key)) evidenceMap.set(key, []);
+    evidenceMap.get(key)!.push(adaptEvidence(be));
+  }
+
+  return chainBounties.map(b => {
+    const pda = b.publicKey.toBase58();
+    return adaptBounty(
+      b,
+      metaMap.get(pda) ?? null,
+      evidenceMap.get(pda) ?? [],
+    );
+  });
 }
 
 /** Fetch a single bounty by its PDA (base58). */
@@ -171,13 +230,14 @@ export async function fetchBountyById(id: string): Promise<Bounty | null> {
     return null;
   }
 
-  const [onChain, meta] = await Promise.all([
+  const [onChain, meta, backendEvidence] = await Promise.all([
     fetchBountyByPda(pda),
     fetchMeta(id),
+    fetchEvidenceByPda(id),
   ]);
 
   if (!onChain) return null;
-  return adaptBounty(onChain, meta);
+  return adaptBounty(onChain, meta, backendEvidence.map(adaptEvidence));
 }
 
 /** Fetch on-chain profile data for a connected wallet. */

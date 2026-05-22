@@ -6,13 +6,27 @@ import {
   createClaimBodySchema,
   getClaimsQuerySchema
 } from "../schemas/claimSchemas";
+import { preScreenClaim } from "../services/preScreenClaim";
 
 export const claimRouter = Router();
 
 claimRouter.post("/", validate({ body: createClaimBodySchema }), async (req, res, next) => {
   try {
+    // AI pre-screening: check if the claim is worth fact-checking
+    let preScreen = null;
+    try {
+      preScreen = await preScreenClaim(req.body.claimText);
+    } catch (err) {
+      // Non-fatal: if Gemini fails, just skip pre-screening
+      console.warn("Pre-screening skipped:", (err as Error).message);
+    }
+
     const claim = await ClaimModel.create(req.body);
-    res.status(201).json(claim);
+
+    res.status(201).json({
+      ...claim.toJSON(),
+      preScreen,
+    });
   } catch (error) {
     next(error);
   }
