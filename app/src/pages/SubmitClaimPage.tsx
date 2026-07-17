@@ -33,6 +33,7 @@ const SubmitClaimPage = () => {
     txSignature: string;
     bountyId: string;
     bountyPda: string;
+    metadataSaved: boolean;
   } | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -75,7 +76,7 @@ const SubmitClaimPage = () => {
         tags:        form.tags.split(',').map(t => t.trim()).filter(Boolean),
       });
 
-      toast.success('Bounty created & SOL locked on-chain! 🎉', { id: toastId });
+      result.metadataSaved ? toast.success('Bounty created and metadata synced.', { id: toastId }) : toast.error('Bounty created on-chain, but metadata sync failed. Keep the transaction ID.', { id: toastId, duration: 8000 });
       setSuccess(result);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Transaction failed';
@@ -104,7 +105,6 @@ const SubmitClaimPage = () => {
           <p className="text-textSecondary mb-6 text-sm">
             SOL has been locked in the escrow vault on Solana Devnet.
           </p>
-
           <div className="bg-surfaceLight rounded-lg p-4 mb-6 text-left space-y-3">
             <div>
               <span className="label">Bounty PDA</span>
@@ -127,7 +127,6 @@ const SubmitClaimPage = () => {
               </a>
             </div>
           </div>
-
           <div className="flex gap-3">
             <button
               onClick={() => {

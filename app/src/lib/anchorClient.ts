@@ -25,10 +25,10 @@ import IDL_JSON from './veri_bounty_idl.json';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 export const PROGRAM_ID = new PublicKey(
-  '8xmwE6esqnwxKMGrdszEiBEKnA6PjZNSsh6ByKZxC8Za'
+  import.meta.env.VITE_PROGRAM_ID ?? IDL_JSON.address
 );
 
-export const DEVNET_ENDPOINT = clusterApiUrl('devnet');
+export const DEVNET_ENDPOINT = import.meta.env.VITE_SOLANA_RPC_URL ?? clusterApiUrl('devnet');
 
 const SEED_BOUNTY      = Buffer.from('bounty');
 const SEED_ESCROW      = Buffer.from('escrow_vault');

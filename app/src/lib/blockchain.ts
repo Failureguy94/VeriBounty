@@ -7,7 +7,6 @@
  */
 
 import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { BN } from '@coral-xyz/anchor';
 import type { AnchorWallet } from '@solana/wallet-adapter-react';
 
 import {
@@ -91,12 +90,30 @@ async function fetchAllMeta(): Promise<BountyMeta[]> {
   }
 }
 
-async function saveMeta(meta: BountyMeta): Promise<void> {
-  await fetch(`${BACKEND_URL}/claims`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(meta),
-  });
+async function saveMeta(meta: BountyMeta): Promise<boolean> {
+  try {
+    const response = await fetch(BACKEND_URL + '/claims', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(meta),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function saveEvidence(evidence: Omit<BackendEvidence, '_id' | 'createdAt'>): Promise<boolean> {
+  try {
+    const response = await fetch(BACKEND_URL + '/evidence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(evidence),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 // ─── Evidence helpers ─────────────────────────────────────────────────────────
@@ -142,9 +159,7 @@ function adaptBounty(
   const pda    = onChain.publicKey.toBase58();
   const acc    = onChain.account;
   const cs     = statusToString(acc.status) as ChainStatus;
-  const stakeLamports = acc.stakeLamports instanceof BN
-    ? acc.stakeLamports
-    : new BN(acc.stakeLamports.toString());
+  const stakeLamports = acc.stakeLamports;
 
   const stakeSOL = stakeLamports.toNumber() / LAMPORTS_PER_SOL;
   const resolution = resolutionToString(acc.resolution);
@@ -254,9 +269,7 @@ export async function fetchUserProfile(
   ]);
 
   const totalStaked = submitted.reduce((acc, b) => {
-    const lamps = b.account.stakeLamports instanceof BN
-      ? b.account.stakeLamports
-      : new BN(b.account.stakeLamports.toString());
+    const lamps = b.account.stakeLamports;
     return acc + lamps.toNumber() / LAMPORTS_PER_SOL;
   }, 0);
 
@@ -272,9 +285,7 @@ export async function fetchUserProfile(
   // the fact-checker AND resolution was Accepted
   const totalEarned = resolved.reduce((acc, b) => {
     if (b.account.resolution && 'accepted' in b.account.resolution) {
-      const lamps = b.account.stakeLamports instanceof BN
-        ? b.account.stakeLamports
-        : new BN(b.account.stakeLamports.toString());
+      const lamps = b.account.stakeLamports;
       return acc + lamps.toNumber() / LAMPORTS_PER_SOL;
     }
     return acc;
@@ -318,7 +329,7 @@ export async function submitClaim(params: {
   stakeAmount: number;  // SOL
   category: string;
   tags: string[];
-}): Promise<{ txSignature: string; bountyId: string; bountyPda: string }> {
+}): Promise<{ txSignature: string; bountyId: string; bountyPda: string; metadataSaved: boolean }> {
   const { wallet, claim, description, stakeAmount, category, tags } = params;
 
   // 1. On-chain: create the bounty & lock SOL
@@ -331,7 +342,7 @@ export async function submitClaim(params: {
 
   // 2. Off-chain: save metadata to backend
   const now = Date.now();
-  await saveMeta({
+  const metadataSaved = await saveMeta({
     bountyPDA:       pdaStr,
     claimText:       claim,
     description,
@@ -347,6 +358,7 @@ export async function submitClaim(params: {
     txSignature,
     bountyId: bountyId.toString(),
     bountyPda: pdaStr,
+    metadataSaved,
   };
 }
 
@@ -373,11 +385,22 @@ export async function submitVerdict(params: {
   bountyPda: string;
   verdict: boolean;         // true = claim is TRUE
   evidenceIpfsHash: string; // IPFS CID or short description (≤128 chars)
-}): Promise<string> {
-  return anchorSubmitVerdict({
+}): Promise<{ txSignature: string; evidenceSaved: boolean }> {
+  const txSignature = await anchorSubmitVerdict({
     wallet: params.wallet,
     bountyPda: new PublicKey(params.bountyPda),
     verdict: params.verdict,
     evidenceIpfsHash: params.evidenceIpfsHash,
   });
+
+  const evidenceSaved = await saveEvidence({
+    bountyPDA: params.bountyPda,
+    factCheckerWallet: params.wallet.publicKey.toBase58(),
+    evidenceText: params.evidenceIpfsHash,
+    sourceURLs: [],
+    ipfsHash: params.evidenceIpfsHash,
+    verdict: params.verdict,
+  });
+
+  return { txSignature, evidenceSaved };
 }

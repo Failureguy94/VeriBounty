@@ -7,8 +7,6 @@ import { Search, Filter, TrendingUp, Shield, Zap, Award } from 'lucide-react';
 
 const CATEGORIES = ['All', 'Technology', 'Health', 'Finance', 'Policy', 'Science'];
 const STATUSES: (BountyStatus | 'all')[] = ['all', 'open', 'in-review', 'resolved', 'disputed'];
-
-
 const HomePage = () => {
   const [bounties, setBounties] = useState<Bounty[]>([]);
   const [filtered, setFiltered] = useState<Bounty[]>([]);
@@ -17,9 +15,7 @@ const HomePage = () => {
   const [category, setCategory] = useState('All');
   const [status, setStatus] = useState<BountyStatus | 'all'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'stake' | 'submissions'>('newest');
-
   const [stats, setStats] = useState({ active: '—', staked: '—', resolved: '—', avgResolution: '—' });
-
   useEffect(() => {
     fetchBounties().then(data => {
       setBounties(data);

@@ -4,7 +4,7 @@
 
 set -e
 
-PROGRAM_ID="8xmwE6esqnwxKMGrdszEiBEKnA6PjZNSsh6ByKZxC8Za"
+PROGRAM_ID="36aWnuK3fcbHBXhuSDZcEwgnZhgcQKdB9Drgkj8twUMW"
 KEYPAIR="$HOME/.config/solana/id.json"
 
 echo "═══════════════════════════════════════════"

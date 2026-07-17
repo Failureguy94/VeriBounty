@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke_signed, system_instruction};
 use anchor_lang::system_program;
 
-declare_id!("8xmwE6esqnwxKMGrdszEiBEKnA6PjZNSsh6ByKZxC8Za");
+declare_id!("36aWnuK3fcbHBXhuSDZcEwgnZhgcQKdB9Drgkj8twUMW");
 
 const SEED_BOUNTY: &[u8] = b"bounty";
 const SEED_ESCROW_VAULT: &[u8] = b"escrow_vault";
@@ -11,7 +11,7 @@ const SEED_REPUTATION: &[u8] = b"reputation";
 pub const MAX_EVIDENCE_IPFS_HASH_LEN: usize = 128;
 
 
-pub const TRUSTED_RESOLVER: Pubkey = pubkey!("3GkUrSgQpdSFVg7xmc5Zfe6SDQV61GE757VKCMfZ4K48");
+pub const TRUSTED_RESOLVER: Pubkey = pubkey!("DmyZJ6yWcKdZS6MSQHtYJJbucxPKKc2Jdy2MgqdkvwwS");
 
 #[program]
 pub mod veri_bounty {

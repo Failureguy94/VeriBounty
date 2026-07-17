@@ -4,10 +4,12 @@ import { claimRouter } from "./routes/claimRoutes";
 import { evidenceRouter } from "./routes/evidenceRoutes";
 import { reputationRouter } from "./routes/reputationRoutes";
 import { errorHandler } from "./middleware/errorHandler";
+import { env } from "./config/env";
 
 export const app = express();
 
-app.use(cors());
+const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) => origin.trim());
+app.use(cors({ origin: env.NODE_ENV === "development" ? true : allowedOrigins }));
 app.use(express.json());
 
 app.get("/health", (_req, res) => {

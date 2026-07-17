@@ -8,6 +8,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   MONGODB_URI: z.string().min(1, "MONGODB_URI is required").default("mongodb://localhost:27017/veribounty"),
   GEMINI_API_KEY: z.string().optional(),
+  CORS_ORIGIN: z.string().default("http://localhost:5173"),
 });
 
 const parsed = envSchema.safeParse(process.env);

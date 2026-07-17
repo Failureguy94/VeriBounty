@@ -19,6 +19,9 @@ evidenceRouter.post("/", validate({ body: createEvidenceBodySchema }), async (re
       return;
     }
 
+    const existing = await EvidenceModel.findOne({ bountyPDA: payload.bountyPDA, factCheckerWallet: payload.factCheckerWallet, ipfsHash: payload.ipfsHash });
+    if (existing) { res.status(200).json(existing); return; }
+
     const evidence = await EvidenceModel.create(payload);
 
     if (claim.status !== "verdict_submitted") {

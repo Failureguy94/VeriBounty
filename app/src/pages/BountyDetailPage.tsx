@@ -7,7 +7,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import StatusBadge from '../components/StatusBadge';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeft, Coins, Clock, CheckCircle2, XCircle, AlertTriangle,
+  ArrowLeft, CheckCircle2, XCircle, AlertTriangle,
   HelpCircle, ThumbsUp, ExternalLink, Copy, Check, Shield, Zap,
 } from 'lucide-react';
 
@@ -87,14 +87,14 @@ const BountyDetailPage = () => {
     setSubmittingVerdict(true);
     const toastId = toast.loading('Submitting verdict on-chain…');
     try {
-      const sig = await submitVerdict({
+      const result = await submitVerdict({
         wallet: anchorWallet,
         bountyPda: bounty.id,
         verdict: verdictChoice,
         evidenceIpfsHash: evidenceText.trim(),
       });
-      toast.success('Verdict submitted on-chain! 🎉', { id: toastId });
-      console.log('Verdict tx:', sig);
+      result.evidenceSaved ? toast.success('Verdict submitted and evidence synced.', { id: toastId }) : toast.error('Verdict is on-chain, but evidence sync failed.', { id: toastId, duration: 8000 });
+      console.log('Verdict tx:', result.txSignature);
       setShowVerdictForm(false);
       loadBounty();
     } catch (err) {

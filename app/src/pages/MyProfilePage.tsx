@@ -33,8 +33,6 @@ const MyProfilePage = () => {
 
   useEffect(() => { loadProfile(); }, [connected, publicKey]);
 
-  const formatDate = (ts: number) =>
-    new Date(ts).toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
 
   const explorerUrl = publicKey
     ? `https://explorer.solana.com/address/${publicKey.toBase58()}?cluster=devnet`

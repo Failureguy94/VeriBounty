@@ -12,6 +12,9 @@ export const claimRouter = Router();
 
 claimRouter.post("/", validate({ body: createClaimBodySchema }), async (req, res, next) => {
   try {
+    const existing = await ClaimModel.findOne({ bountyPDA: req.body.bountyPDA });
+    if (existing) { res.status(200).json(existing); return; }
+
     // AI pre-screening: check if the claim is worth fact-checking
     let preScreen = null;
     try {

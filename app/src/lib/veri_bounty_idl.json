@@ -1,5 +1,5 @@
 {
-  "address": "8xmwE6esqnwxKMGrdszEiBEKnA6PjZNSsh6ByKZxC8Za",
+  "address": "36aWnuK3fcbHBXhuSDZcEwgnZhgcQKdB9Drgkj8twUMW",
   "metadata": {
     "name": "veri_bounty",
     "version": "0.1.0",
@@ -163,7 +163,7 @@
           "name": "resolver",
           "writable": true,
           "signer": true,
-          "address": "3GkUrSgQpdSFVg7xmc5Zfe6SDQV61GE757VKCMfZ4K48"
+          "address": "DmyZJ6yWcKdZS6MSQHtYJJbucxPKKc2Jdy2MgqdkvwwS"
         },
         {
           "name": "bounty",
