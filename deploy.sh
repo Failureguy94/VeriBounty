@@ -68,7 +68,7 @@ echo "🚀 Deploying to Devnet..."
 
 # 5. Deploy
 solana program deploy \
-  --program-id "$PROGRAM_ID" \
+  --program-id target/deploy/veri_bounty-keypair.json \
   target/deploy/veri_bounty.so \
   --url devnet \
   2>&1
