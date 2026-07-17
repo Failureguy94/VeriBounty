@@ -36,6 +36,7 @@
     "postcss": "^8.5.1",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",
+    "vercel": "^56.3.1",
     "vite": "^6.0.5",
     "vite-plugin-node-polyfills": "^0.23.0"
   },
