@@ -287,8 +287,7 @@ describe("veri_bounty", () => {
     try {
       await program.methods
         .resolveBounty({ accepted: {} })
-        .accounts({
-          resolver: unauthorizedUser.publicKey,
+        .accountsPartial({
           bounty: bountyPda,
           escrowVault: escrowVaultPda,
           submitter: submitter.publicKey,
@@ -350,8 +349,7 @@ describe("veri_bounty", () => {
     // Resolve as Accepted
     await program.methods
       .resolveBounty({ accepted: {} })
-      .accounts({
-        resolver: resolver.publicKey,
+      .accountsPartial({
         bounty: bountyPda,
         escrowVault: escrowVaultPda,
         submitter: submitter.publicKey,
@@ -424,8 +422,7 @@ describe("veri_bounty", () => {
     // Resolve as Rejected
     await program.methods
       .resolveBounty({ rejected: {} })
-      .accounts({
-        resolver: resolver.publicKey,
+      .accountsPartial({
         bounty: bountyPda,
         escrowVault: escrowVaultPda,
         submitter: submitter.publicKey,
