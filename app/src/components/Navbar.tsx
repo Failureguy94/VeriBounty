@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { Menu, X } from 'lucide-react';
+import { Menu, Moon, Sun, X } from 'lucide-react';
 import { Container } from './ui';
+import { useTheme } from '../lib/theme';
 
 const navLinks = [
   { to: '/', label: 'Bounties' },
@@ -12,6 +13,8 @@ const navLinks = [
 
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [theme, setTheme] = useTheme();
+  const nextTheme = theme === 'dark' ? 'light' : 'dark';
 
   return (
     <header className="sticky top-0 z-40 border-b border-rule bg-paper/95 backdrop-blur supports-[backdrop-filter]:bg-paper/80">
@@ -45,6 +48,15 @@ const Navbar = () => {
           <span className="hidden font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-ink-3 sm:inline">
             Devnet
           </span>
+          <button
+            type="button"
+            onClick={() => setTheme(nextTheme)}
+            className="rounded p-1.5 text-ink-2 transition-colors hover:bg-rule/60 hover:text-ink"
+            aria-label={`Switch to ${nextTheme} theme`}
+            title={`Switch to ${nextTheme} theme`}
+          >
+            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
           <WalletMultiButton />
           <button
             type="button"

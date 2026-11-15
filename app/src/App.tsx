@@ -36,16 +36,16 @@ const App = () => (
       position="bottom-right"
       toastOptions={{
         style: {
-          background: '#FFFFFF',
-          color: '#1A1A1A',
-          border: '1px solid #E2DED5',
+          background: 'rgb(var(--surface))',
+          color: 'rgb(var(--ink))',
+          border: '1px solid rgb(var(--rule))',
           borderRadius: '0.375rem',
-          boxShadow: '0 8px 24px rgba(26, 26, 26, 0.08)',
+          boxShadow: '0 8px 24px rgb(var(--shadow) / 0.12)',
           fontFamily: '"IBM Plex Sans", system-ui, sans-serif',
           fontSize: '0.875rem',
         },
-        success: { iconTheme: { primary: '#2D6A3E', secondary: '#FFFFFF' } },
-        error: { iconTheme: { primary: '#A1342A', secondary: '#FFFFFF' } },
+        success: { iconTheme: { primary: 'rgb(var(--positive))', secondary: 'rgb(var(--surface))' } },
+        error: { iconTheme: { primary: 'rgb(var(--negative))', secondary: 'rgb(var(--surface))' } },
       }}
     />
   </BrowserRouter>
