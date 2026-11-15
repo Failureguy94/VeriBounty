@@ -192,7 +192,7 @@ function adaptBounty(
     id:              pda,
     bountyId:        acc.bountyId.toString(),
     claim:           meta?.claimText   ?? `Bounty ${pda.slice(0, 8)}`,
-    description:     meta?.description ?? 'No description stored.',
+    description:     meta?.description ?? '',
     stakeAmount:     stakeSOL,
     stakeLamports:   stakeLamports.toString(),
     status:          chainStatusToUI(cs),
@@ -299,20 +299,20 @@ export async function fetchUserProfile(
   );
 
   // Dynamic badges based on on-chain activity
-  const badges = [];
-  if (submitted.length >= 1)
-    badges.push({ id: 'first-submit', name: 'First Bounty', description: 'Submitted your first bounty on-chain', icon: '🚀', earnedAt: Date.now() });
-  if (claimed.length >= 1)
-    badges.push({ id: 'first-claim', name: 'First Claim', description: 'Claimed your first bounty as a fact-checker', icon: '🔍', earnedAt: Date.now() });
-  if (repScore >= 5)
-    badges.push({ id: 'rep5', name: 'Trusted Verifier', description: 'Earned a reputation score of 5+', icon: '🏆', earnedAt: Date.now() });
-  if (totalStaked >= 1)
-    badges.push({ id: 'staker', name: 'SOL Staker', description: 'Staked 1+ SOL across bounties', icon: '💎', earnedAt: Date.now() });
+  // Milestones derived from on-chain activity
+  const badges = [
+    { id: 'first-submit', name: 'First bounty', description: 'Created a bounty on-chain', earned: submitted.length >= 1 },
+    { id: 'first-claim',  name: 'First claim',  description: 'Claimed a bounty as a fact-checker', earned: claimed.length >= 1 },
+    { id: 'staker',       name: '1 SOL staked', description: 'Staked at least 1 SOL across bounties', earned: totalStaked >= 1 },
+    { id: 'rep5',         name: 'Trusted fact-checker', description: 'Reached a reputation score of 5', earned: repScore >= 5 },
+  ];
 
   return {
     walletAddress,
     reputationScore:    repScore,
     bountiesSubmitted:  submitted.length,
+    bountiesClaimed:    claimed.length,
+    verdictsResolved:   resolved.length,
     bountiesResolved:   accepted.length,
     totalStaked:        parseFloat(totalStaked.toFixed(4)),
     totalEarned:        parseFloat(totalEarned.toFixed(4)),

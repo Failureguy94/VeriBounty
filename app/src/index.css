@@ -3,20 +3,13 @@
 @tailwind utilities;
 
 @layer base {
-  * {
-    box-sizing: border-box;
-  }
-
   html {
-    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   body {
-    background-color: #0f0520;
-    color: #f3f0ff;
-    font-family: 'Inter', system-ui, sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
+    @apply bg-paper font-sans text-ink;
   }
 
   #root {
@@ -25,126 +18,130 @@
     flex-direction: column;
   }
 
-  /* Scrollbar */
-  ::-webkit-scrollbar {
-    width: 6px;
+  ::selection {
+    background: theme('colors.accent.wash');
   }
-  ::-webkit-scrollbar-track {
-    background: #0f0520;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: #3d2466;
-    border-radius: 3px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #a855f7;
+
+  :focus-visible {
+    outline: 2px solid theme('colors.accent.DEFAULT');
+    outline-offset: 2px;
   }
 }
 
 @layer components {
-  .btn-primary {
-    @apply bg-primary text-background font-bold px-6 py-2.5 rounded-lg transition-all duration-200 hover:bg-primaryHover hover:shadow-glow-gold hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100;
+  /* Small uppercase label used for section titles and stat labels */
+  .eyebrow {
+    @apply text-xs font-medium uppercase tracking-[0.08em] text-ink-3;
   }
 
-  .btn-secondary {
-    @apply border border-border text-textPrimary font-medium px-6 py-2.5 rounded-lg transition-all duration-200 hover:border-accent hover:text-accent hover:bg-surfaceLight active:scale-95;
+  .input {
+    @apply block w-full rounded border border-rule-strong bg-surface px-3 py-2 text-sm text-ink transition-colors placeholder:text-ink-3 hover:border-ink-3 focus:border-ink focus:outline-none disabled:cursor-not-allowed disabled:opacity-60;
   }
 
-  .card {
-    @apply bg-card-gradient border border-border rounded-xl p-6 shadow-card transition-all duration-200;
+  .input[aria-invalid='true'] {
+    @apply border-negative;
   }
 
-  .card-hover {
-    @apply card hover:border-accent/50 hover:shadow-glow-purple hover:-translate-y-1;
-  }
-
-  .input-field {
-    @apply bg-surfaceLight border border-border rounded-lg px-4 py-3 text-textPrimary placeholder-textSecondary focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-colors duration-200 w-full;
-  }
-
-  .label {
-    @apply text-textSecondary text-sm font-medium mb-1.5 block;
-  }
-
-  .gradient-text {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent;
-  }
-
-  .section-title {
-    @apply text-2xl font-bold text-textPrimary mb-6;
+  .link {
+    @apply text-accent underline decoration-accent/30 underline-offset-2 transition-colors hover:decoration-accent;
   }
 }
 
-/* Wallet adapter UI overrides */
+/* ── Solana wallet adapter: match the site instead of its default dark theme ── */
+
 .wallet-adapter-button {
-  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%) !important;
-  color: #0f0520 !important;
-  font-family: 'Inter', sans-serif !important;
-  font-weight: 700 !important;
-  border-radius: 0.5rem !important;
-  transition: all 0.2s !important;
-  height: auto !important;
-  padding: 0.625rem 1.25rem !important;
+  height: 2.25rem !important;
+  padding: 0 0.875rem !important;
+  border-radius: 0.25rem !important;
+  background: theme('colors.ink.DEFAULT') !important;
+  color: theme('colors.paper') !important;
+  font-family: theme('fontFamily.sans') !important;
   font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  line-height: 1 !important;
 }
 
-.wallet-adapter-button:hover {
-  box-shadow: 0 0 20px rgba(255, 215, 0, 0.4) !important;
-  transform: scale(1.03) !important;
+.wallet-adapter-button:not([disabled]):hover {
+  background: theme('colors.ink.2') !important;
+}
+
+.wallet-adapter-button-start-icon,
+.wallet-adapter-button-start-icon img {
+  width: 18px !important;
+  height: 18px !important;
+  margin-right: 8px !important;
+}
+
+.wallet-adapter-dropdown-list {
+  background: theme('colors.surface') !important;
+  border: 1px solid theme('colors.rule.DEFAULT') !important;
+  border-radius: 0.375rem !important;
+  box-shadow: 0 8px 24px rgba(26, 26, 26, 0.08) !important;
+  font-family: theme('fontFamily.sans') !important;
+}
+
+.wallet-adapter-dropdown-list-item {
+  color: theme('colors.ink.DEFAULT') !important;
+  font-family: theme('fontFamily.sans') !important;
+  font-weight: 400 !important;
+  border-radius: 0.25rem !important;
+}
+
+.wallet-adapter-dropdown-list-item:not([disabled]):hover {
+  background: theme('colors.paper') !important;
+}
+
+.wallet-adapter-modal-overlay {
+  background: rgba(26, 26, 26, 0.45) !important;
 }
 
 .wallet-adapter-modal-wrapper {
-  background: #1a0a38 !important;
-  border: 1px solid #3d2466 !important;
-  border-radius: 1rem !important;
+  background: theme('colors.surface') !important;
+  border: 1px solid theme('colors.rule.DEFAULT') !important;
+  border-radius: 0.5rem !important;
+  box-shadow: 0 16px 48px rgba(26, 26, 26, 0.12) !important;
+  font-family: theme('fontFamily.sans') !important;
 }
 
 .wallet-adapter-modal-title {
-  color: #f3f0ff !important;
-  font-family: 'Inter', sans-serif !important;
+  color: theme('colors.ink.DEFAULT') !important;
+  font-family: theme('fontFamily.serif') !important;
+  font-weight: 600 !important;
+}
+
+.wallet-adapter-modal-button-close {
+  background: theme('colors.paper') !important;
+}
+
+.wallet-adapter-modal-button-close svg {
+  fill: theme('colors.ink.3') !important;
 }
 
 .wallet-adapter-modal-list .wallet-adapter-button {
-  background: #25104d !important;
-  color: #f3f0ff !important;
-  border: 1px solid #3d2466 !important;
+  height: 3rem !important;
+  background: transparent !important;
+  color: theme('colors.ink.DEFAULT') !important;
+  border-radius: 0.25rem !important;
 }
 
-.wallet-adapter-modal-list .wallet-adapter-button:hover {
-  background: #3d2466 !important;
-  box-shadow: none !important;
-  transform: none !important;
+.wallet-adapter-modal-list .wallet-adapter-button:not([disabled]):hover {
+  background: theme('colors.paper') !important;
 }
 
-/* Animations */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.wallet-adapter-modal-list .wallet-adapter-button span {
+  color: theme('colors.ink.3') !important;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.wallet-adapter-modal-list-more {
+  color: theme('colors.ink.2') !important;
+  font-family: theme('fontFamily.sans') !important;
 }
 
-.animate-fadeInUp {
-  animation: fadeInUp 0.5s ease forwards;
+.wallet-adapter-modal-list-more svg {
+  fill: theme('colors.ink.2') !important;
 }
 
-.animate-fadeIn {
-  animation: fadeIn 0.4s ease forwards;
+.wallet-adapter-modal-middle-button {
+  background: theme('colors.ink.DEFAULT') !important;
+  color: theme('colors.paper') !important;
 }
-
-/* Staggered children */
-.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
-.stagger-children > *:nth-child(2) { animation-delay: 80ms; }
-.stagger-children > *:nth-child(3) { animation-delay: 160ms; }
-.stagger-children > *:nth-child(4) { animation-delay: 240ms; }
-.stagger-children > *:nth-child(5) { animation-delay: 320ms; }
-.stagger-children > *:nth-child(6) { animation-delay: 400ms; }

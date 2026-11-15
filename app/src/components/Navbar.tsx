@@ -1,67 +1,67 @@
+import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { Shield, Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { Menu, X } from 'lucide-react';
+import { Container } from './ui';
+
+const navLinks = [
+  { to: '/', label: 'Bounties' },
+  { to: '/submit', label: 'Submit a claim' },
+  { to: '/profile', label: 'Profile' },
+];
 
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const navLinks = [
-    { to: '/', label: 'Browse Bounties' },
-    { to: '/submit', label: 'Submit Claim' },
-    { to: '/profile', label: 'My Profile' },
-  ];
-
   return (
-    <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-lg bg-gold-gradient flex items-center justify-center shadow-glow-gold group-hover:shadow-glow-gold transition-all duration-200">
-              <Shield size={16} className="text-background" strokeWidth={2.5} />
-            </div>
-            <span className="font-bold text-xl tracking-tight">
-              <span className="gradient-text">Veri</span>
-              <span className="text-textPrimary">Bounty</span>
-            </span>
+    <header className="sticky top-0 z-40 border-b border-rule bg-paper/95 backdrop-blur supports-[backdrop-filter]:bg-paper/80">
+      <Container className="flex h-16 items-center justify-between gap-6">
+        <div className="flex h-full items-center gap-10">
+          <Link to="/" className="font-serif text-xl font-semibold tracking-tight text-ink">
+            VeriBounty
           </Link>
 
-          {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-1">
+          <nav className="hidden h-full items-center gap-7 md:flex" aria-label="Main">
             {navLinks.map(link => (
               <NavLink
                 key={link.to}
                 to={link.to}
                 end={link.to === '/'}
                 className={({ isActive }) =>
-                  `px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
+                  `inline-flex h-full items-center border-b-2 text-sm transition-colors ${
                     isActive
-                      ? 'bg-surfaceLight text-primary'
-                      : 'text-textSecondary hover:text-textPrimary hover:bg-surfaceLight/60'
+                      ? 'border-ink font-medium text-ink'
+                      : 'border-transparent text-ink-2 hover:text-ink'
                   }`
                 }
               >
                 {link.label}
               </NavLink>
             ))}
-          </div>
-
-          {/* Wallet + Mobile menu */}
-          <div className="flex items-center gap-3">
-            <WalletMultiButton />
-            <button
-              className="md:hidden text-textSecondary hover:text-textPrimary p-1.5"
-              onClick={() => setMenuOpen(o => !o)}
-            >
-              {menuOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
-          </div>
+          </nav>
         </div>
 
-        {/* Mobile Nav */}
-        {menuOpen && (
-          <div className="md:hidden border-t border-border/50 py-3 space-y-1 animate-fadeIn">
+        <div className="flex items-center gap-4">
+          <span className="hidden font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-ink-3 sm:inline">
+            Devnet
+          </span>
+          <WalletMultiButton />
+          <button
+            type="button"
+            className="-mr-1 p-1 text-ink-2 hover:text-ink md:hidden"
+            onClick={() => setMenuOpen(o => !o)}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-nav"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          >
+            {menuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+      </Container>
+
+      {menuOpen && (
+        <nav id="mobile-nav" className="border-t border-rule md:hidden" aria-label="Main">
+          <Container className="flex flex-col py-2">
             {navLinks.map(link => (
               <NavLink
                 key={link.to}
@@ -69,20 +69,16 @@ const Navbar = () => {
                 end={link.to === '/'}
                 onClick={() => setMenuOpen(false)}
                 className={({ isActive }) =>
-                  `block px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                    isActive
-                      ? 'bg-surfaceLight text-primary'
-                      : 'text-textSecondary hover:text-textPrimary hover:bg-surfaceLight/60'
-                  }`
+                  `py-2.5 text-sm ${isActive ? 'font-medium text-ink' : 'text-ink-2'}`
                 }
               >
                 {link.label}
               </NavLink>
             ))}
-          </div>
-        )}
-      </div>
-    </nav>
+          </Container>
+        </nav>
+      )}
+    </header>
   );
 };
 

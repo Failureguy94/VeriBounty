@@ -1,49 +1,35 @@
-import { Link } from 'react-router-dom';
-import { Shield, Github, Twitter } from 'lucide-react';
+import { Container } from './ui';
+import { PROGRAM_ID } from '../lib/anchorClient';
+import { explorerUrl } from '../lib/format';
 
-const Footer = () => {
-  return (
-    <footer className="mt-auto border-t border-border/50 bg-surface/40">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          {/* Brand */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-gold-gradient flex items-center justify-center">
-              <Shield size={13} className="text-background" strokeWidth={2.5} />
-            </div>
-            <span className="font-bold text-lg">
-              <span className="gradient-text">Veri</span>
-              <span className="text-textPrimary">Bounty</span>
-            </span>
-          </div>
-
-          {/* Links */}
-          <div className="flex items-center gap-6 text-sm text-textSecondary">
-            <Link to="/" className="hover:text-primary transition-colors">Browse</Link>
-            <Link to="/submit" className="hover:text-primary transition-colors">Submit</Link>
-            <Link to="/profile" className="hover:text-primary transition-colors">Profile</Link>
-            <span className="text-border">|</span>
-            <a href="#" className="hover:text-primary transition-colors flex items-center gap-1.5">
-              <Github size={14} /> GitHub
-            </a>
-            <a href="#" className="hover:text-primary transition-colors flex items-center gap-1.5">
-              <Twitter size={14} /> Twitter
-            </a>
-          </div>
-
-          {/* Network */}
-          <div className="flex items-center gap-2 text-xs text-textSecondary">
-            <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-            Solana Devnet
-          </div>
-        </div>
-
-        <div className="mt-6 pt-6 border-t border-border/30 text-center text-xs text-textSecondary/60">
-          © 2025 VeriBounty. Built on Solana. All bounties are managed by smart contracts.
-        </div>
-      </div>
-    </footer>
-  );
-};
+const Footer = () => (
+  <footer className="mt-auto border-t border-rule">
+    <Container className="flex flex-col gap-4 py-8 text-sm text-ink-3 sm:flex-row sm:items-center sm:justify-between">
+      <p>
+        <span className="font-serif font-semibold text-ink">VeriBounty</span>
+        <span className="mx-2" aria-hidden="true">·</span>
+        Fact-checking bounties on Solana devnet. Stakes are held in escrow by an on-chain program.
+      </p>
+      <nav className="flex gap-5" aria-label="Footer">
+        <a
+          href={explorerUrl('address', PROGRAM_ID.toBase58())}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-ink"
+        >
+          Program
+        </a>
+        <a
+          href="https://github.com/Failureguy94/VeriBounty"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-ink"
+        >
+          Source
+        </a>
+      </nav>
+    </Container>
+  </footer>
+);
 
 export default Footer;

@@ -1,11 +1,18 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useWallet, useAnchorWallet } from '@solana/wallet-adapter-react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
+import { useAnchorWallet, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import toast from 'react-hot-toast';
 import { submitClaim } from '../lib/blockchain';
 import { CATEGORIES } from '../lib/constants';
-import toast from 'react-hot-toast';
-import { FileText, Coins, Tag, ChevronDown, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
+import { explorerUrl, formatSol } from '../lib/format';
+import { Address, Button, Container, DetailList, Field, PageHeader, Panel, buttonClasses } from '../components/ui';
+
+const CLAIM_MIN = 20;
+const CLAIM_MAX = 200;
+const CONTEXT_MIN = 50;
+const CONTEXT_MAX = 1000;
+const MIN_STAKE = 0.1;
 
 interface FormData {
   claim: string;
@@ -15,76 +22,73 @@ interface FormData {
   tags: string;
 }
 
+type Errors = Partial<Record<keyof FormData, string>>;
+
+const EMPTY_FORM: FormData = { claim: '', description: '', stakeAmount: '', category: CATEGORIES[0], tags: '' };
+
+const validate = (form: FormData): Errors => {
+  const errors: Errors = {};
+  const stake = parseFloat(form.stakeAmount);
+  if (form.claim.trim().length < CLAIM_MIN) errors.claim = `Write at least ${CLAIM_MIN} characters.`;
+  if (form.description.trim().length < CONTEXT_MIN) errors.description = `Write at least ${CONTEXT_MIN} characters.`;
+  if (Number.isNaN(stake) || stake < MIN_STAKE) errors.stakeAmount = `The minimum stake is ${MIN_STAKE} SOL.`;
+  return errors;
+};
+
 const SubmitClaimPage = () => {
   const { connected } = useWallet();
   const anchorWallet = useAnchorWallet();
-  const navigate = useNavigate();
 
-  const [form, setForm] = useState<FormData>({
-    claim: '',
-    description: '',
-    stakeAmount: '',
-    category: 'Technology',
-    tags: '',
-  });
+  const [form, setForm] = useState<FormData>(EMPTY_FORM);
+  const [errors, setErrors] = useState<Errors>({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<{
     txSignature: string;
-    bountyId: string;
     bountyPda: string;
+    stake: number;
     metadataSaved: boolean;
   } | null>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
+    if (errors[name as keyof FormData]) setErrors(prev => ({ ...prev, [name]: undefined }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-
     if (!connected || !anchorWallet) {
-      toast.error('Please connect your wallet first');
+      toast.error('Connect a wallet first.');
       return;
     }
+
+    const found = validate(form);
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
 
     const stake = parseFloat(form.stakeAmount);
-    if (!form.claim.trim() || form.claim.length < 20) {
-      toast.error('Claim must be at least 20 characters');
-      return;
-    }
-    if (!form.description.trim() || form.description.length < 50) {
-      toast.error('Description must be at least 50 characters');
-      return;
-    }
-    if (isNaN(stake) || stake < 0.1) {
-      toast.error('Minimum stake is 0.1 SOL');
-      return;
-    }
-
     setLoading(true);
-    const toastId = toast.loading('Requesting wallet approval…');
+    const toastId = toast.loading('Waiting for wallet approval…');
 
     try {
       const result = await submitClaim({
-        wallet:      anchorWallet,
-        claim:       form.claim.trim(),
+        wallet: anchorWallet,
+        claim: form.claim.trim(),
         description: form.description.trim(),
         stakeAmount: stake,
-        category:    form.category,
-        tags:        form.tags.split(',').map(t => t.trim()).filter(Boolean),
+        category: form.category,
+        tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
       });
-
-      result.metadataSaved ? toast.success('Bounty created and metadata synced.', { id: toastId }) : toast.error('Bounty created on-chain, but metadata sync failed. Keep the transaction ID.', { id: toastId, duration: 8000 });
-      setSuccess(result);
+      toast.dismiss(toastId);
+      setSuccess({ txSignature: result.txSignature, bountyPda: result.bountyPda, stake, metadataSaved: result.metadataSaved });
+      window.scrollTo({ top: 0 });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Transaction failed';
-      // Surface user-friendly message for common Anchor errors
       // System program error 0x1 = insufficient funds for the escrow transfer
       if (/insufficient lamports|no record of a prior credit|custom program error: 0x1$/im.test(msg)) {
-        toast.error('Insufficient SOL balance', { id: toastId });
+        toast.error('Not enough SOL in your wallet for this stake.', { id: toastId });
       } else if (msg.includes('User rejected')) {
-        toast.error('Transaction cancelled', { id: toastId });
+        toast.error('Transaction cancelled.', { id: toastId });
       } else {
         toast.error(msg, { id: toastId });
       }
@@ -93,212 +97,186 @@ const SubmitClaimPage = () => {
     }
   };
 
+  // ── Success ──────────────────────────────────────────────────────────────────
   if (success) {
-    const explorerUrl = `https://explorer.solana.com/tx/${success.txSignature}?cluster=devnet`;
     return (
-      <div className="flex-1 flex items-center justify-center px-4 py-16">
-        <div className="card max-w-md w-full text-center animate-fadeInUp">
-          <div className="w-16 h-16 rounded-full bg-success/15 border border-success/30 flex items-center justify-center mx-auto mb-5">
-            <CheckCircle2 size={32} className="text-success" />
+      <Container className="py-10 sm:py-14">
+        <div className="max-w-2xl">
+          <PageHeader
+            eyebrow="Bounty created"
+            title="Your claim is open for fact-checking"
+            description={<p>{formatSol(success.stake)} is now locked in escrow. You can cancel and get it back until someone claims the bounty.</p>}
+          />
+
+          {!success.metadataSaved && (
+            <p className="mt-6 rounded border border-pending/30 bg-pending-wash px-4 py-3 text-sm text-pending">
+              The bounty exists on-chain, but its text couldn't be saved to the server, so it will show without a
+              description. Keep the transaction link below.
+            </p>
+          )}
+
+          <div className="mt-6">
+            <DetailList
+              items={[
+                { label: 'Bounty account', value: <Address value={success.bountyPda} explorer /> },
+                {
+                  label: 'Transaction',
+                  value: (
+                    <a href={explorerUrl('tx', success.txSignature)} target="_blank" rel="noopener noreferrer" className="link font-mono text-[0.8125rem]">
+                      {success.txSignature.slice(0, 16)}…
+                    </a>
+                  ),
+                },
+              ]}
+            />
           </div>
-          <h2 className="text-2xl font-bold text-textPrimary mb-1">Bounty Created!</h2>
-          <p className="text-textSecondary mb-6 text-sm">
-            SOL has been locked in the escrow vault on Solana Devnet.
-          </p>
-          <div className="bg-surfaceLight rounded-lg p-4 mb-6 text-left space-y-3">
-            <div>
-              <span className="label">Bounty PDA</span>
-              <code className="text-primary font-mono text-xs break-all">{success.bountyPda}</code>
-            </div>
-            <div>
-              <span className="label">Bounty ID</span>
-              <code className="text-accentLight font-mono text-sm">{success.bountyId}</code>
-            </div>
-            <div>
-              <span className="label">Transaction</span>
-              <a
-                href={explorerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-accent hover:text-accentLight text-xs font-mono break-all transition-colors"
-              >
-                {success.txSignature.slice(0, 32)}…
-                <ExternalLink size={11} />
-              </a>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <button
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link to={`/bounty/${success.bountyPda}`} className={buttonClasses('primary')}>
+              View bounty
+            </Link>
+            <Button
+              variant="secondary"
               onClick={() => {
                 setSuccess(null);
-                setForm({ claim: '', description: '', stakeAmount: '', category: 'Technology', tags: '' });
+                setForm(EMPTY_FORM);
               }}
-              className="btn-secondary flex-1"
             >
-              Submit Another
-            </button>
-            <button onClick={() => navigate('/')} className="btn-primary flex-1">
-              Browse Bounties
-            </button>
+              Submit another
+            </Button>
           </div>
         </div>
-      </div>
+      </Container>
     );
   }
 
+  // ── Form ─────────────────────────────────────────────────────────────────────
+  const stake = parseFloat(form.stakeAmount);
+  const stakeValid = !Number.isNaN(stake) && stake >= MIN_STAKE;
+
   return (
-    <div className="flex-1 max-w-2xl mx-auto w-full px-4 sm:px-6 py-12">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-textPrimary mb-2">Submit a Claim</h1>
-        <p className="text-textSecondary">
-          Stake <strong>real SOL</strong> to open a fact-checking bounty on Solana Devnet. Fact-checkers investigate and earn rewards.
-        </p>
-      </div>
-
-      {/* Wallet gate */}
-      {!connected && (
-        <div className="card mb-6 flex items-center gap-4 bg-warning/5 border-warning/30">
-          <AlertCircle size={20} className="text-warning flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm text-textPrimary font-medium">Wallet not connected</p>
-            <p className="text-xs text-textSecondary">Connect your Solana wallet to submit a claim and stake SOL</p>
-          </div>
-          <WalletMultiButton />
-        </div>
-      )}
-
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="card space-y-5">
-        {/* Claim */}
-        <div>
-          <label className="label flex items-center gap-1.5">
-            <FileText size={13} /> Claim Statement *
-          </label>
-          <input
-            type="text"
-            name="claim"
-            value={form.claim}
-            onChange={handleChange}
-            className="input-field"
-            placeholder="Enter the specific claim you want fact-checked..."
-            maxLength={200}
-          />
-          <div className="flex justify-between mt-1">
-            <span className="text-xs text-textSecondary">Min 20 characters</span>
-            <span className="text-xs text-textSecondary">{form.claim.length}/200</span>
-          </div>
-        </div>
-
-        {/* Description */}
-        <div>
-          <label className="label flex items-center gap-1.5">
-            <FileText size={13} /> Detailed Description *
-          </label>
-          <textarea
-            name="description"
-            value={form.description}
-            onChange={handleChange}
-            rows={4}
-            className="input-field resize-none"
-            placeholder="Provide context about where this claim appeared, why it's important to verify..."
-            maxLength={1000}
-          />
-          <div className="flex justify-between mt-1">
-            <span className="text-xs text-textSecondary">Min 50 characters</span>
-            <span className="text-xs text-textSecondary">{form.description.length}/1000</span>
-          </div>
-        </div>
-
-        {/* Category + Stake */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="label">Category *</label>
-            <div className="relative">
-              <select
-                name="category"
-                value={form.category}
-                onChange={handleChange}
-                className="input-field appearance-none pr-9"
-              >
-                {CATEGORIES.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-textSecondary pointer-events-none" />
-            </div>
-          </div>
-
-          <div>
-            <label className="label flex items-center gap-1.5">
-              <Coins size={13} /> Stake Amount (SOL) *
-            </label>
-            <input
-              type="number"
-              name="stakeAmount"
-              value={form.stakeAmount}
-              onChange={handleChange}
-              className="input-field"
-              placeholder="e.g. 0.1"
-              min="0.1"
-              step="0.01"
-            />
-            <span className="text-xs text-textSecondary mt-1 block">Min 0.1 SOL • Locked in escrow</span>
-          </div>
-        </div>
-
-        {/* Tags */}
-        <div>
-          <label className="label flex items-center gap-1.5">
-            <Tag size={13} /> Tags <span className="text-textSecondary/60">(optional)</span>
-          </label>
-          <input
-            type="text"
-            name="tags"
-            value={form.tags}
-            onChange={handleChange}
-            className="input-field"
-            placeholder="Bitcoin, Elon Musk, Climate (comma-separated)"
-          />
-        </div>
-
-        {/* Bounty preview */}
-        {(form.stakeAmount || form.claim) && (
-          <div className="bg-surfaceLight rounded-lg p-4 border border-border/40 text-sm space-y-2">
-            <p className="text-textSecondary font-medium text-xs uppercase tracking-wider mb-2">Transaction Preview</p>
-            {form.stakeAmount && parseFloat(form.stakeAmount) > 0 && (
-              <p className="text-textSecondary">
-                You will stake: <span className="text-primary font-bold">{form.stakeAmount} SOL</span>
-                {' '}→ locked in escrow PDA
-              </p>
-            )}
-            <p className="text-textSecondary text-xs">
-              A Solana wallet approval dialog will appear. Once confirmed, SOL is transferred to the program escrow on Devnet.
+    <Container className="py-10 sm:py-14">
+      <div className="max-w-2xl">
+        <PageHeader
+          eyebrow="New bounty"
+          title="Submit a claim"
+          description={
+            <p>
+              Describe a claim you want verified and lock SOL as the reward. The stake stays in escrow until a
+              verdict is accepted or rejected, and you can cancel any time before someone claims it.
             </p>
-          </div>
+          }
+        />
+
+        {!connected && (
+          <Panel className="mt-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-ink-2">Connect a Solana wallet on devnet to submit a claim.</p>
+              <WalletMultiButton />
+            </div>
+          </Panel>
         )}
 
-        {/* Submit */}
-        <button
-          type="submit"
-          id="submit-claim-btn"
-          className="btn-primary w-full flex items-center justify-center gap-2 py-3 text-base"
-          disabled={loading || !connected}
-        >
-          {loading ? (
-            <>
-              <span className="w-4 h-4 border-2 border-background/40 border-t-background rounded-full animate-spin" />
-              Waiting for wallet…
-            </>
-          ) : (
-            <>
-              <Coins size={16} />
-              Submit & Stake SOL On-Chain
-            </>
-          )}
-        </button>
-      </form>
-    </div>
+        <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-6">
+          <Field
+            label="Claim"
+            htmlFor="claim"
+            hint="One specific, checkable statement."
+            counter={`${form.claim.length}/${CLAIM_MAX}`}
+            error={errors.claim}
+          >
+            <input
+              id="claim"
+              name="claim"
+              type="text"
+              value={form.claim}
+              onChange={handleChange}
+              maxLength={CLAIM_MAX}
+              placeholder="e.g. The city's new bridge cost twice its approved budget"
+              aria-invalid={!!errors.claim}
+              aria-describedby="claim-hint"
+              className="input"
+            />
+          </Field>
+
+          <Field
+            label="Context"
+            htmlFor="description"
+            hint="Where the claim appeared and what a fact-checker should look at."
+            counter={`${form.description.length}/${CONTEXT_MAX}`}
+            error={errors.description}
+          >
+            <textarea
+              id="description"
+              name="description"
+              rows={5}
+              value={form.description}
+              onChange={handleChange}
+              maxLength={CONTEXT_MAX}
+              aria-invalid={!!errors.description}
+              aria-describedby="description-hint"
+              className="input resize-y leading-relaxed"
+            />
+          </Field>
+
+          <div className="grid gap-6 sm:grid-cols-2">
+            <Field label="Category" htmlFor="category">
+              <select id="category" name="category" value={form.category} onChange={handleChange} className="input">
+                {CATEGORIES.map(c => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Stake" htmlFor="stakeAmount" hint={`Minimum ${MIN_STAKE} SOL`} error={errors.stakeAmount}>
+              <div className="relative">
+                <input
+                  id="stakeAmount"
+                  name="stakeAmount"
+                  type="number"
+                  inputMode="decimal"
+                  min={MIN_STAKE}
+                  step="0.01"
+                  value={form.stakeAmount}
+                  onChange={handleChange}
+                  placeholder="0.10"
+                  aria-invalid={!!errors.stakeAmount}
+                  aria-describedby="stakeAmount-hint"
+                  className="input pr-12 font-mono"
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-3">SOL</span>
+              </div>
+            </Field>
+          </div>
+
+          <Field label="Tags" htmlFor="tags" optional hint="Separate with commas.">
+            <input
+              id="tags"
+              name="tags"
+              type="text"
+              value={form.tags}
+              onChange={handleChange}
+              placeholder="infrastructure, budget"
+              aria-describedby="tags-hint"
+              className="input"
+            />
+          </Field>
+
+          <div className="flex flex-col-reverse gap-4 border-t border-rule pt-6 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-ink-2">
+              {stakeValid
+                ? `${formatSol(stake)} will be locked in escrow. Your wallet will ask you to approve.`
+                : 'Your wallet will ask you to approve the transaction.'}
+            </p>
+            <Button type="submit" loading={loading} disabled={!connected} className="shrink-0">
+              {loading ? 'Waiting for wallet' : 'Submit and lock stake'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </Container>
   );
 };
 

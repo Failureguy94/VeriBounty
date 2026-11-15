@@ -1,41 +1,38 @@
-import { BountyStatus } from '../types';
+import type { ChainStatus } from '../types';
 
 interface Props {
-  status: BountyStatus;
-  size?: 'sm' | 'md';
+  status: ChainStatus;
+  resolution?: 'accepted' | 'rejected' | null;
 }
 
-const statusConfig: Record<BountyStatus, { label: string; className: string; dot: string }> = {
-  open: {
-    label: 'Open',
-    className: 'bg-success/10 text-success border border-success/30',
-    dot: 'bg-success',
-  },
-  'in-review': {
-    label: 'In Review',
-    className: 'bg-warning/10 text-warning border border-warning/30',
-    dot: 'bg-warning',
-  },
-  resolved: {
-    label: 'Resolved',
-    className: 'bg-accent/10 text-accentLight border border-accent/30',
-    dot: 'bg-accentLight',
-  },
-  disputed: {
-    label: 'Disputed',
-    className: 'bg-danger/10 text-danger border border-danger/30',
-    dot: 'bg-danger',
-  },
+export const STATUS_LABELS: Record<ChainStatus, string> = {
+  open: 'Open',
+  'in-review': 'Claimed',
+  'verdict-submitted': 'Awaiting resolution',
+  resolved: 'Resolved',
 };
 
-const StatusBadge = ({ status, size = 'sm' }: Props) => {
-  const config = statusConfig[status];
-  const sizeClass = size === 'sm' ? 'text-xs px-2.5 py-1' : 'text-sm px-3 py-1.5';
+const tone = {
+  accent: 'bg-accent-wash text-accent',
+  pending: 'bg-pending-wash text-pending',
+  positive: 'bg-positive-wash text-positive',
+  negative: 'bg-negative-wash text-negative',
+} as const;
+
+/** Status of a bounty, labelled from its on-chain state. */
+const StatusBadge = ({ status, resolution }: Props) => {
+  let label = STATUS_LABELS[status];
+  let className: string = tone.pending;
+
+  if (status === 'open') className = tone.accent;
+  if (status === 'resolved') {
+    label = resolution === 'accepted' ? 'Accepted' : resolution === 'rejected' ? 'Rejected' : 'Resolved';
+    className = resolution === 'rejected' ? tone.negative : tone.positive;
+  }
 
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full font-medium ${config.className} ${sizeClass}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${config.dot} animate-pulse-slow`} />
-      {config.label}
+    <span className={`inline-flex items-center rounded-sm px-1.5 py-0.5 text-[0.6875rem] font-medium uppercase tracking-[0.06em] ${className}`}>
+      {label}
     </span>
   );
 };

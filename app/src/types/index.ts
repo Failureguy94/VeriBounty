@@ -76,6 +76,11 @@ export interface UserProfile {
   walletAddress: string;
   reputationScore: number;
   bountiesSubmitted: number;
+  /** Bounties this wallet claimed as fact-checker */
+  bountiesClaimed: number;
+  /** Claimed bounties that have been resolved (accepted or rejected) */
+  verdictsResolved: number;
+  /** Claimed bounties whose verdict was accepted */
   bountiesResolved: number;
   totalStaked: number;
   totalEarned: number;
@@ -88,6 +93,5 @@ export interface Badge {
   id: string;
   name: string;
   description: string;
-  icon: string;
-  earnedAt: number;
+  earned: boolean;
 }
