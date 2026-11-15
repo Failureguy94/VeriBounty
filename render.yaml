@@ -3,6 +3,7 @@ services:
   - type: web
     name: veribounty-backend
     runtime: node
+    plan: free   # without this, Render defaults to the paid Starter plan
     rootDir: backend
     # NODE_ENV=production is also set at build time, which makes a plain
     # `npm install` skip devDependencies (typescript) — so include them explicitly.
