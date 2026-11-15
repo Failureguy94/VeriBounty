@@ -7,6 +7,7 @@ import {
   getClaimsQuerySchema
 } from "../schemas/claimSchemas";
 import { preScreenClaim } from "../services/preScreenClaim";
+import { env } from "../config/env";
 
 export const claimRouter = Router();
 
@@ -15,21 +16,16 @@ claimRouter.post("/", validate({ body: createClaimBodySchema }), async (req, res
     const existing = await ClaimModel.findOne({ bountyPDA: req.body.bountyPDA });
     if (existing) { res.status(200).json(existing); return; }
 
-    // AI pre-screening: check if the claim is worth fact-checking
-    let preScreen = null;
-    try {
-      preScreen = await preScreenClaim(req.body.claimText);
-    } catch (err) {
-      // Non-fatal: if Gemini fails, just skip pre-screening
-      console.warn("Pre-screening skipped:", (err as Error).message);
-    }
-
     const claim = await ClaimModel.create(req.body);
+    res.status(201).json(claim);
 
-    res.status(201).json({
-      ...claim.toJSON(),
-      preScreen,
-    });
+    // AI pre-screening runs after responding so Gemini latency/failures never
+    // block or break claim creation. The result is stored on the claim.
+    if (env.GEMINI_API_KEY) {
+      preScreenClaim(claim.claimText)
+        .then((preScreen) => ClaimModel.updateOne({ _id: claim._id }, { $set: { preScreen } }))
+        .catch((err: Error) => console.warn("Pre-screening skipped:", err.message));
+    }
   } catch (error) {
     next(error);
   }

@@ -177,10 +177,10 @@ const MyProfilePage = () => {
         <div className="card">
           <div className="flex items-center gap-2 mb-3">
             <CheckCircle2 size={16} className="text-success" />
-            <h3 className="text-sm font-semibold text-textPrimary">Verdicts Resolved</h3>
+            <h3 className="text-sm font-semibold text-textPrimary">Verdicts Accepted</h3>
           </div>
           <div className="text-3xl font-extrabold text-success">{profile.bountiesResolved}</div>
-          <div className="text-textSecondary text-xs mt-1">Accepted on-chain</div>
+          <div className="text-textSecondary text-xs mt-1">Paid out on-chain</div>
         </div>
       </div>
 

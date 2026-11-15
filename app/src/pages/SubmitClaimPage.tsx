@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useWallet, useAnchorWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { submitClaim } from '../lib/blockchain';
+import { CATEGORIES } from '../lib/constants';
 import toast from 'react-hot-toast';
 import { FileText, Coins, Tag, ChevronDown, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
-
-const CATEGORIES = ['Technology', 'Health', 'Finance', 'Policy', 'Science', 'Politics', 'Environment', 'Other'];
 
 interface FormData {
   claim: string;
@@ -81,7 +80,8 @@ const SubmitClaimPage = () => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Transaction failed';
       // Surface user-friendly message for common Anchor errors
-      if (msg.includes('0x1')) {
+      // System program error 0x1 = insufficient funds for the escrow transfer
+      if (/insufficient lamports|no record of a prior credit|custom program error: 0x1$/im.test(msg)) {
         toast.error('Insufficient SOL balance', { id: toastId });
       } else if (msg.includes('User rejected')) {
         toast.error('Transaction cancelled', { id: toastId });

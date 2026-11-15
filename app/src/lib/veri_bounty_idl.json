@@ -8,6 +8,96 @@
   },
   "instructions": [
     {
+      "name": "cancel_bounty",
+      "docs": [
+        "Submitter withdraws an unclaimed bounty: the full escrow is refunded and",
+        "the bounty account is closed (its rent also goes back to the submitter)."
+      ],
+      "discriminator": [
+        79,
+        65,
+        107,
+        143,
+        128,
+        165,
+        135,
+        46
+      ],
+      "accounts": [
+        {
+          "name": "submitter",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "bounty"
+          ]
+        },
+        {
+          "name": "bounty",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  117,
+                  110,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty.submitter",
+                "account": "Bounty"
+              },
+              {
+                "kind": "account",
+                "path": "bounty.bounty_id",
+                "account": "Bounty"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "claim_bounty",
       "discriminator": [
         225,
@@ -163,7 +253,7 @@
           "name": "resolver",
           "writable": true,
           "signer": true,
-          "address": "DmyZJ6yWcKdZS6MSQHtYJJbucxPKKc2Jdy2MgqdkvwwS"
+          "address": "GFEJ3s8AmahS1SPCsrSAetSc2e8VYAGXfVTJcxF45nKE"
         },
         {
           "name": "bounty",
@@ -323,22 +413,22 @@
         242,
         234
       ]
-    },
-    {
-      "name": "UserReputation",
-      "discriminator": [
-        86,
-        95,
-        94,
-        218,
-        215,
-        219,
-        207,
-        37
-      ]
     }
   ],
   "events": [
+    {
+      "name": "BountyCancelled",
+      "discriminator": [
+        234,
+        186,
+        248,
+        214,
+        198,
+        69,
+        152,
+        23
+      ]
+    },
     {
       "name": "BountyClaimed",
       "discriminator": [
@@ -462,6 +552,11 @@
       "code": 6013,
       "name": "MathOverflow",
       "msg": "Math overflow"
+    },
+    {
+      "code": 6014,
+      "name": "CannotAcceptWithoutVerdict",
+      "msg": "A bounty without a submitted verdict can only be rejected (refunded)"
     }
   ],
   "types": [
@@ -521,6 +616,26 @@
           {
             "name": "vault_bump",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BountyCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bounty",
+            "type": "pubkey"
+          },
+          {
+            "name": "submitter",
+            "type": "pubkey"
+          },
+          {
+            "name": "refunded_lamports",
+            "type": "u64"
           }
         ]
       }
@@ -631,26 +746,6 @@
           },
           {
             "name": "Rejected"
-          }
-        ]
-      }
-    },
-    {
-      "name": "UserReputation",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "wallet",
-            "type": "pubkey"
-          },
-          {
-            "name": "score",
-            "type": "u64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
           }
         ]
       }

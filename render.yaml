@@ -1,0 +1,24 @@
+# Render Blueprint — must live at the repo root to be detected.
+services:
+  - type: web
+    name: veribounty-backend
+    runtime: node
+    rootDir: backend
+    # NODE_ENV=production is also set at build time, which makes a plain
+    # `npm install` skip devDependencies (typescript) — so include them explicitly.
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: MONGODB_URI
+        sync: false   # Set in Render dashboard
+      - key: GEMINI_API_KEY
+        sync: false   # Set in Render dashboard (optional)
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: CORS_ORIGIN
+        sync: false   # Your Vercel frontend URL(s), comma-separated

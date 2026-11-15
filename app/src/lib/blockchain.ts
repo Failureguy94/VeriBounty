@@ -19,6 +19,8 @@ import {
   createBounty as anchorCreateBounty,
   claimBounty as anchorClaimBounty,
   submitVerdict as anchorSubmitVerdict,
+  resolveBounty as anchorResolveBounty,
+  cancelBounty as anchorCancelBounty,
   statusToString,
   resolutionToString,
   type OnChainBounty,
@@ -31,6 +33,12 @@ import { chainStatusToUI } from '../types';
 
 const BACKEND_URL: string = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:4000';
 const DEFAULT_PUBKEY = '11111111111111111111111111111111';
+const BACKEND_TIMEOUT_MS = 8000;
+
+/** fetch() that gives up after BACKEND_TIMEOUT_MS so a slow/dead backend can't stall the UI. */
+function fetchWithTimeout(input: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(input, { ...init, signal: AbortSignal.timeout(BACKEND_TIMEOUT_MS) });
+}
 
 // ─── Off-chain metadata type (matches MongoDB Claim schema) ───────────────────
 
@@ -61,7 +69,7 @@ interface BackendEvidence {
 
 async function fetchMeta(bountyPda: string): Promise<BountyMeta | null> {
   try {
-    const res = await fetch(`${BACKEND_URL}/claims/${bountyPda}`);
+    const res = await fetchWithTimeout(`${BACKEND_URL}/claims/${bountyPda}`);
     if (!res.ok) return null;
     const d = await res.json();
     // Normalise date fields from ISO strings to timestamps
@@ -77,7 +85,7 @@ async function fetchMeta(bountyPda: string): Promise<BountyMeta | null> {
 
 async function fetchAllMeta(): Promise<BountyMeta[]> {
   try {
-    const res = await fetch(`${BACKEND_URL}/claims`);
+    const res = await fetchWithTimeout(`${BACKEND_URL}/claims`);
     if (!res.ok) return [];
     const arr: BountyMeta[] = await res.json();
     return arr.map(d => ({
@@ -92,7 +100,7 @@ async function fetchAllMeta(): Promise<BountyMeta[]> {
 
 async function saveMeta(meta: BountyMeta): Promise<boolean> {
   try {
-    const response = await fetch(BACKEND_URL + '/claims', {
+    const response = await fetchWithTimeout(BACKEND_URL + '/claims', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(meta),
@@ -105,7 +113,7 @@ async function saveMeta(meta: BountyMeta): Promise<boolean> {
 
 async function saveEvidence(evidence: Omit<BackendEvidence, '_id' | 'createdAt'>): Promise<boolean> {
   try {
-    const response = await fetch(BACKEND_URL + '/evidence', {
+    const response = await fetchWithTimeout(BACKEND_URL + '/evidence', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(evidence),
@@ -120,7 +128,7 @@ async function saveEvidence(evidence: Omit<BackendEvidence, '_id' | 'createdAt'>
 
 async function fetchEvidenceByPda(bountyPda: string): Promise<BackendEvidence[]> {
   try {
-    const res = await fetch(`${BACKEND_URL}/evidence/${bountyPda}`);
+    const res = await fetchWithTimeout(`${BACKEND_URL}/evidence/${bountyPda}`);
     if (!res.ok) return [];
     return await res.json();
   } catch {
@@ -130,7 +138,7 @@ async function fetchEvidenceByPda(bountyPda: string): Promise<BackendEvidence[]>
 
 async function fetchAllEvidence(): Promise<BackendEvidence[]> {
   try {
-    const res = await fetch(`${BACKEND_URL}/evidence`);
+    const res = await fetchWithTimeout(`${BACKEND_URL}/evidence`);
     if (!res.ok) return [];
     return await res.json();
   } catch {
@@ -276,20 +284,19 @@ export async function fetchUserProfile(
   const resolved = claimed.filter(
     b => 'resolved' in b.account.status
   );
+  // Bounties where this wallet was the fact-checker and the resolver accepted the verdict
+  const accepted = resolved.filter(
+    b => b.account.resolution !== null && 'accepted' in b.account.resolution
+  );
 
-  const successRate = claimed.length > 0
-    ? Math.round((resolved.length / claimed.length) * 100)
+  const successRate = resolved.length > 0
+    ? Math.round((accepted.length / resolved.length) * 100)
     : 0;
 
-  // Compute earned: sum lamports of resolved bounties where this wallet was
-  // the fact-checker AND resolution was Accepted
-  const totalEarned = resolved.reduce((acc, b) => {
-    if (b.account.resolution && 'accepted' in b.account.resolution) {
-      const lamps = b.account.stakeLamports;
-      return acc + lamps.toNumber() / LAMPORTS_PER_SOL;
-    }
-    return acc;
-  }, 0);
+  const totalEarned = accepted.reduce(
+    (acc, b) => acc + b.account.stakeLamports.toNumber() / LAMPORTS_PER_SOL,
+    0,
+  );
 
   // Dynamic badges based on on-chain activity
   const badges = [];
@@ -306,7 +313,7 @@ export async function fetchUserProfile(
     walletAddress,
     reputationScore:    repScore,
     bountiesSubmitted:  submitted.length,
-    bountiesResolved:   resolved.length,
+    bountiesResolved:   accepted.length,
     totalStaked:        parseFloat(totalStaked.toFixed(4)),
     totalEarned:        parseFloat(totalEarned.toFixed(4)),
     successRate,
@@ -403,4 +410,28 @@ export async function submitVerdict(params: {
   });
 
   return { txSignature, evidenceSaved };
+}
+
+/** Resolve a bounty (trusted resolver wallet only). See anchorClient.resolveBounty. */
+export async function resolveBounty(params: {
+  wallet: AnchorWallet;
+  bountyPda: string;
+  resolution: 'accepted' | 'rejected';
+}): Promise<string> {
+  return anchorResolveBounty({
+    wallet: params.wallet,
+    bountyPda: new PublicKey(params.bountyPda),
+    resolution: params.resolution,
+  });
+}
+
+/** Cancel an open bounty as its submitter (full refund, account closed). */
+export async function cancelBounty(params: {
+  wallet: AnchorWallet;
+  bountyPda: string;
+}): Promise<string> {
+  return anchorCancelBounty({
+    wallet: params.wallet,
+    bountyPda: new PublicKey(params.bountyPda),
+  });
 }
