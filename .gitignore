@@ -25,3 +25,10 @@ pnpm-debug.log*
 /backend/dist/
 /backend/.env
 /app/.env
+
+# Secret keypairs — never commit (the resolver key lives in ~/.config/solana/)
+/tests/resolver.json
+*-resolver.json
+
+# Local validator ledger / logs created by `anchor test`
+/.anchor/

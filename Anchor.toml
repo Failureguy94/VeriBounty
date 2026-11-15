@@ -6,6 +6,9 @@ anchor_version = "0.30.1"
 resolution = true
 skip-lint = false
 
+[programs.localnet]
+veri_bounty = "36aWnuK3fcbHBXhuSDZcEwgnZhgcQKdB9Drgkj8twUMW"
+
 [programs.devnet]
 veri_bounty = "36aWnuK3fcbHBXhuSDZcEwgnZhgcQKdB9Drgkj8twUMW"
 

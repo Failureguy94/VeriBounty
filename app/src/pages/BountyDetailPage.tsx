@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Bounty } from '../types';
-import { fetchBountyById, claimBounty, submitVerdict } from '../lib/blockchain';
+import { fetchBountyById, claimBounty, submitVerdict, resolveBounty, cancelBounty } from '../lib/blockchain';
+import { TRUSTED_RESOLVER } from '../lib/anchorClient';
 import { useAnchorWallet, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import StatusBadge from '../components/StatusBadge';
 import toast from 'react-hot-toast';
 import {
   ArrowLeft, CheckCircle2, XCircle, AlertTriangle,
-  HelpCircle, ThumbsUp, ExternalLink, Copy, Check, Shield, Zap,
+  HelpCircle, ThumbsUp, ExternalLink, Copy, Check, Shield, Zap, Gavel, Undo2,
 } from 'lucide-react';
 
 const verdictConfig = {
@@ -22,6 +23,7 @@ const BountyDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const { connected, publicKey } = useWallet();
   const anchorWallet = useAnchorWallet();
+  const navigate = useNavigate();
 
   const [bounty, setBounty] = useState<Bounty | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,6 +37,10 @@ const BountyDetailPage = () => {
   const [verdictChoice, setVerdictChoice] = useState<boolean | null>(null);
   const [evidenceText, setEvidenceText] = useState('');
   const [submittingVerdict, setSubmittingVerdict] = useState(false);
+
+  // Resolver / cancel state
+  const [resolving, setResolving] = useState<'accepted' | 'rejected' | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   const loadBounty = () => {
     if (!id) return;
@@ -106,6 +112,50 @@ const BountyDetailPage = () => {
     }
   };
 
+  const showTxError = (err: unknown, toastId: string) => {
+    const msg = err instanceof Error ? err.message : 'Transaction failed';
+    if (msg.includes('User rejected')) toast.error('Transaction cancelled', { id: toastId });
+    else toast.error(msg, { id: toastId });
+  };
+
+  // ── Resolve (trusted resolver only) ─────────────────────────────────────────
+  const handleResolve = async (resolution: 'accepted' | 'rejected') => {
+    if (!anchorWallet || !bounty) return;
+    setResolving(resolution);
+    const toastId = toast.loading('Resolving bounty on-chain…');
+    try {
+      const sig = await resolveBounty({ wallet: anchorWallet, bountyPda: bounty.id, resolution });
+      toast.success(
+        resolution === 'accepted' ? 'Verdict accepted — fact-checker paid.' : 'Bounty rejected — stake refunded to submitter.',
+        { id: toastId },
+      );
+      console.log('Resolve tx:', sig);
+      loadBounty();
+    } catch (err) {
+      showTxError(err, toastId);
+    } finally {
+      setResolving(null);
+    }
+  };
+
+  // ── Cancel (submitter, open bounties only) ──────────────────────────────────
+  const handleCancel = async () => {
+    if (!anchorWallet || !bounty) return;
+    if (!window.confirm('Cancel this bounty and refund your stake?')) return;
+    setCancelling(true);
+    const toastId = toast.loading('Cancelling bounty…');
+    try {
+      const sig = await cancelBounty({ wallet: anchorWallet, bountyPda: bounty.id });
+      toast.success('Bounty cancelled — stake refunded.', { id: toastId });
+      console.log('Cancel tx:', sig);
+      navigate('/'); // the bounty account is closed on-chain
+    } catch (err) {
+      showTxError(err, toastId);
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-12">
@@ -138,6 +188,9 @@ const BountyDetailPage = () => {
   const isFactChecker = walletAddr === bounty.factChecker;
   const canClaim      = connected && !isSubmitter && bounty.chainStatus === 'open';
   const canVerdict    = connected && isFactChecker && bounty.chainStatus === 'in-review';
+  const isResolver    = walletAddr === TRUSTED_RESOLVER.toBase58();
+  const canResolve    = connected && isResolver &&
+    (bounty.chainStatus === 'verdict-submitted' || bounty.chainStatus === 'in-review');
   const explorerUrl   = `https://explorer.solana.com/address/${bounty.id}?cluster=devnet`;
 
   return (
@@ -219,7 +272,17 @@ const BountyDetailPage = () => {
           {!connected ? (
             <WalletMultiButton />
           ) : isSubmitter ? (
-            <p className="text-textSecondary text-xs italic">You submitted this bounty and cannot claim your own.</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-textSecondary text-xs italic flex-1">You submitted this bounty and cannot claim your own.</p>
+              <button
+                id="cancel-bounty-btn"
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="btn-secondary flex items-center gap-2"
+              >
+                {cancelling ? 'Cancelling…' : (<><Undo2 size={15} /> Cancel &amp; Refund</>)}
+              </button>
+            </div>
           ) : (
             <button
               id="claim-bounty-btn"
@@ -310,6 +373,57 @@ const BountyDetailPage = () => {
                 </button>
               </div>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Resolve (trusted resolver only) */}
+      {canResolve && (
+        <div className="card mb-6 border border-primary/30 bg-primary/5">
+          <div className="flex items-center gap-2 mb-3">
+            <Gavel size={16} className="text-primary" />
+            <h2 className="text-sm font-semibold text-textPrimary">Resolve Bounty</h2>
+          </div>
+          {bounty.chainStatus === 'verdict-submitted' ? (
+            <>
+              <p className="text-textSecondary text-sm mb-4">
+                Accept pays {bounty.stakeAmount.toFixed(4)} SOL to the fact-checker and increases their reputation.
+                Reject refunds the stake to the submitter.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  id="resolve-accept-btn"
+                  onClick={() => handleResolve('accepted')}
+                  disabled={resolving !== null}
+                  className="btn-primary flex-1"
+                >
+                  {resolving === 'accepted' ? 'Resolving…' : 'Accept Verdict'}
+                </button>
+                <button
+                  id="resolve-reject-btn"
+                  onClick={() => handleResolve('rejected')}
+                  disabled={resolving !== null}
+                  className="btn-secondary flex-1"
+                >
+                  {resolving === 'rejected' ? 'Resolving…' : 'Reject Verdict'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-textSecondary text-sm mb-4">
+                This bounty was claimed but no verdict has been submitted. If the fact-checker has abandoned it,
+                you can refund the stake to the submitter.
+              </p>
+              <button
+                id="resolve-refund-btn"
+                onClick={() => handleResolve('rejected')}
+                disabled={resolving !== null}
+                className="btn-secondary"
+              >
+                {resolving ? 'Refunding…' : 'Refund Submitter'}
+              </button>
+            </>
           )}
         </div>
       )}

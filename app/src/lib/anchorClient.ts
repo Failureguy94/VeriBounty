@@ -30,6 +30,11 @@ export const PROGRAM_ID = new PublicKey(
 
 export const DEVNET_ENDPOINT = import.meta.env.VITE_SOLANA_RPC_URL ?? clusterApiUrl('devnet');
 
+/** Must match `TRUSTED_RESOLVER` in programs/veri_bounty/src/lib.rs. */
+export const TRUSTED_RESOLVER = new PublicKey(
+  import.meta.env.VITE_RESOLVER_PUBKEY ?? 'GFEJ3s8AmahS1SPCsrSAetSc2e8VYAGXfVTJcxF45nKE'
+);
+
 const SEED_BOUNTY      = Buffer.from('bounty');
 const SEED_ESCROW      = Buffer.from('escrow_vault');
 const SEED_REPUTATION  = Buffer.from('reputation');
@@ -196,15 +201,26 @@ export async function fetchBountiesByFactChecker(
 /**
  * Fetch the reputation score for a wallet (0 if no account yet).
  */
+// Anchor 0.30 omits `UserReputation` from the generated IDL (no instruction takes
+// it as a typed account), so decode it by hand instead of via program.account.
+// Layout: 8-byte discriminator | wallet: Pubkey (32) | score: u64 LE | bump: u8
+const USER_REPUTATION_DISCRIMINATOR = Buffer.from([86, 95, 94, 218, 215, 219, 207, 37]); // sha256("account:UserReputation")[..8]
+
 export async function fetchReputation(wallet: PublicKey): Promise<number> {
-  const provider = getReadonlyProvider();
-  const program  = getProgram(provider);
+  const conn = new Connection(DEVNET_ENDPOINT, 'confirmed');
   const [repPda] = deriveReputationPda(wallet);
 
   try {
-    // @ts-ignore
-    const rep = await program.account.userReputation.fetch(repPda);
-    return (rep.score as BN).toNumber();
+    const info = await conn.getAccountInfo(repPda);
+    if (
+      !info ||
+      !info.owner.equals(PROGRAM_ID) ||
+      info.data.length < 48 ||
+      !Buffer.from(info.data.subarray(0, 8)).equals(USER_REPUTATION_DISCRIMINATOR)
+    ) {
+      return 0;
+    }
+    return Number(Buffer.from(info.data).readBigUInt64LE(40));
   } catch {
     return 0;
   }
@@ -300,6 +316,71 @@ export async function submitVerdict(params: {
     .accounts({
       factChecker: wallet.publicKey,
       bounty:      bountyPda,
+    })
+    .rpc();
+
+  return txSignature;
+}
+
+/**
+ * Resolve a bounty (trusted resolver wallet only).
+ * - `accepted`: stake paid to the fact-checker, reputation +1. Requires a verdict.
+ * - `rejected`: stake refunded to the submitter. Also works on a claimed bounty
+ *   whose fact-checker never submitted a verdict.
+ */
+export async function resolveBounty(params: {
+  wallet: AnchorWallet;
+  bountyPda: PublicKey;
+  resolution: 'accepted' | 'rejected';
+}): Promise<string> {
+  const { wallet, bountyPda, resolution } = params;
+  const provider = getSigningProvider(wallet);
+  const program  = getProgram(provider);
+
+  const onChain = await fetchBountyByPda(bountyPda);
+  if (!onChain) throw new Error('Bounty not found on-chain');
+
+  const [escrowPda]     = await deriveEscrowPda(bountyPda);
+  const [reputationPda] = deriveReputationPda(onChain.account.factChecker);
+
+  // @ts-ignore
+  const txSignature = await program.methods
+    .resolveBounty(resolution === 'accepted' ? { accepted: {} } : { rejected: {} })
+    .accountsPartial({
+      resolver:      wallet.publicKey,
+      bounty:        bountyPda,
+      escrowVault:   escrowPda,
+      submitter:     onChain.account.submitter,
+      factChecker:   onChain.account.factChecker,
+      reputation:    reputationPda,
+      systemProgram: web3.SystemProgram.programId,
+    })
+    .rpc();
+
+  return txSignature;
+}
+
+/**
+ * Cancel an open (unclaimed) bounty as its submitter: refunds the full escrow
+ * and closes the bounty account.
+ */
+export async function cancelBounty(params: {
+  wallet: AnchorWallet;
+  bountyPda: PublicKey;
+}): Promise<string> {
+  const { wallet, bountyPda } = params;
+  const provider = getSigningProvider(wallet);
+  const program  = getProgram(provider);
+  const [escrowPda] = await deriveEscrowPda(bountyPda);
+
+  // @ts-ignore
+  const txSignature = await program.methods
+    .cancelBounty()
+    .accountsPartial({
+      submitter:     wallet.publicKey,
+      bounty:        bountyPda,
+      escrowVault:   escrowPda,
+      systemProgram: web3.SystemProgram.programId,
     })
     .rpc();
 

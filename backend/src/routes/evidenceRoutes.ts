@@ -13,18 +13,16 @@ evidenceRouter.post("/", validate({ body: createEvidenceBodySchema }), async (re
   try {
     const payload = req.body;
 
+    // The on-chain bounty is the source of truth; the off-chain claim record may
+    // be missing (e.g. its metadata sync failed), so evidence is stored regardless.
     const claim = await ClaimModel.findOne({ bountyPDA: payload.bountyPDA });
-    if (!claim) {
-      res.status(404).json({ message: "Claim not found for this bountyPDA" });
-      return;
-    }
 
     const existing = await EvidenceModel.findOne({ bountyPDA: payload.bountyPDA, factCheckerWallet: payload.factCheckerWallet, ipfsHash: payload.ipfsHash });
     if (existing) { res.status(200).json(existing); return; }
 
     const evidence = await EvidenceModel.create(payload);
 
-    if (claim.status !== "verdict_submitted") {
+    if (claim && claim.status !== "verdict_submitted") {
       claim.status = "verdict_submitted";
       await claim.save();
     }

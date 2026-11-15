@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from "@google/generative-ai";
+import { env } from "../config/env";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -13,8 +14,6 @@ export interface PreScreenResult {
 const SYSTEM_PROMPT = `You are a misinformation detector. 
 Given a claim, respond with JSON only: 
 { riskScore: number (0-100), reason: string, isWorthFactChecking: boolean }`;
-
-const MODEL_NAME = "gemini-1.5-flash";
 
 const VAGUE_RISK_THRESHOLD = 20;
 
@@ -46,7 +45,7 @@ function stripCodeFence(raw: string): string {
  *         itself fails with an unrecoverable error.
  */
 export async function preScreenClaim(claimText: string): Promise<PreScreenResult> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not set in environment variables.");
   }
@@ -54,7 +53,7 @@ export async function preScreenClaim(claimText: string): Promise<PreScreenResult
   const client = new GoogleGenerativeAI(apiKey);
 
   const model = client.getGenerativeModel({
-    model: MODEL_NAME,
+    model: env.GEMINI_MODEL,
     // Keep safety settings permissive so legitimate fact-checking topics
     // (violence, health misinformation, etc.) are not blocked.
     safetySettings: [

@@ -4,6 +4,8 @@ import { VeriBounty } from "../target/types/veri_bounty";
 import { PublicKey, Keypair, LAMPORTS_PER_SOL, SystemProgram } from "@solana/web3.js";
 import { expect } from "chai";
 import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 
 describe("veri_bounty", () => {
   // Configure the client to use the local cluster.
@@ -12,8 +14,12 @@ describe("veri_bounty", () => {
 
   const program = anchor.workspace.VeriBounty as Program<VeriBounty>;
 
-  // Load the resolver keypair
-  const resolverKeypairRaw = JSON.parse(fs.readFileSync("./tests/resolver.json", "utf-8"));
+  // Load the resolver keypair. It must match TRUSTED_RESOLVER in lib.rs and is
+  // deliberately kept OUTSIDE the repo — never commit it.
+  const resolverKeypairPath =
+    process.env.RESOLVER_KEYPAIR ??
+    path.join(os.homedir(), ".config", "solana", "veribounty-resolver.json");
+  const resolverKeypairRaw = JSON.parse(fs.readFileSync(resolverKeypairPath, "utf-8"));
   const resolver = Keypair.fromSecretKey(Uint8Array.from(resolverKeypairRaw));
 
   // Keypairs for testing
@@ -28,7 +34,7 @@ describe("veri_bounty", () => {
 
   before(async () => {
     // Airdrop SOL to test accounts
-    const signature1 = await provider.connection.requestAirdrop(submitter.publicKey, 10 * LAMPORTS_PER_SOL);
+    const signature1 = await provider.connection.requestAirdrop(submitter.publicKey, 50 * LAMPORTS_PER_SOL);
     await provider.connection.confirmTransaction(signature1, "confirmed");
 
     const signature2 = await provider.connection.requestAirdrop(factChecker.publicKey, 5 * LAMPORTS_PER_SOL);
@@ -91,9 +97,10 @@ describe("veri_bounty", () => {
     expect(JSON.stringify(bountyAccount.status)).to.contain("open");
     expect(bountyAccount.resolution).to.be.null;
 
-    // Verify vault balance
+    // Verify vault balance: the stake plus the vault's own rent-exempt minimum (space = 0)
     const vaultBalance = await provider.connection.getBalance(escrowVaultPda);
-    expect(vaultBalance).to.equal(stakeAmount.toNumber());
+    const vaultRent = await provider.connection.getMinimumBalanceForRentExemption(0);
+    expect(vaultBalance).to.equal(stakeAmount.toNumber() + vaultRent);
   });
 
   it("Should not allow a submitter to claim their own bounty", async () => {
@@ -288,6 +295,7 @@ describe("veri_bounty", () => {
       await program.methods
         .resolveBounty({ accepted: {} })
         .accountsPartial({
+          resolver: unauthorizedUser.publicKey,
           bounty: bountyPda,
           escrowVault: escrowVaultPda,
           submitter: submitter.publicKey,
@@ -373,10 +381,14 @@ describe("veri_bounty", () => {
     const finalFactCheckerBalance = await provider.connection.getBalance(factChecker.publicKey);
     expect(finalFactCheckerBalance).to.be.greaterThan(initialFactCheckerBalance);
 
-    // Verify reputation account score
-    const reputationAccount = await program.account.userReputation.fetch(reputationPda);
-    expect(reputationAccount.wallet.toBase58()).to.equal(factChecker.publicKey.toBase58());
-    expect(reputationAccount.score.toNumber()).to.equal(1);
+    // Verify reputation account score. UserReputation isn't in the Anchor 0.30 IDL
+    // (no instruction takes it as a typed account), so decode it by hand:
+    // discriminator (8) | wallet (32) | score u64 LE (8) | bump (1)
+    const repInfo = await provider.connection.getAccountInfo(reputationPda);
+    expect(repInfo).to.not.be.null;
+    expect(repInfo!.owner.toBase58()).to.equal(program.programId.toBase58());
+    expect(new PublicKey(repInfo!.data.subarray(8, 40)).toBase58()).to.equal(factChecker.publicKey.toBase58());
+    expect(Number(repInfo!.data.readBigUInt64LE(40))).to.equal(1);
   });
 
   it("Should resolve bounty as Rejected successfully (payout back to submitter)", async () => {
@@ -445,5 +457,142 @@ describe("veri_bounty", () => {
     // Verify submitter received their SOL back
     const finalSubmitterBalance = await provider.connection.getBalance(submitter.publicKey);
     expect(finalSubmitterBalance).to.be.greaterThan(initialSubmitterBalance);
+  });
+
+  // ─── Cancel / refund paths ──────────────────────────────────────────────────
+
+  let nextId = Date.now() + 100;
+  const createOpenBounty = async (lamports = 1 * LAMPORTS_PER_SOL) => {
+    const bountyId = new anchor.BN(nextId++);
+    const [bountyPda] = getBountyPda(submitter.publicKey, bountyId);
+    const [escrowVaultPda] = getEscrowVaultPda(bountyPda);
+    await program.methods
+      .createBounty(bountyId, new anchor.BN(lamports))
+      .accounts({
+        submitter: submitter.publicKey,
+        bounty: bountyPda,
+        escrowVault: escrowVaultPda,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([submitter])
+      .rpc();
+    return { bountyPda, escrowVaultPda };
+  };
+
+  const claim = (bountyPda: PublicKey) =>
+    program.methods
+      .claimBounty()
+      .accounts({ factChecker: factChecker.publicKey, bounty: bountyPda })
+      .signers([factChecker])
+      .rpc();
+
+  it("Should let the submitter cancel an open bounty (full refund, account closed)", async () => {
+    const { bountyPda, escrowVaultPda } = await createOpenBounty();
+    const before = await provider.connection.getBalance(submitter.publicKey);
+
+    await program.methods
+      .cancelBounty()
+      .accountsPartial({
+        submitter: submitter.publicKey,
+        bounty: bountyPda,
+        escrowVault: escrowVaultPda,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([submitter])
+      .rpc();
+
+    expect(await provider.connection.getBalance(escrowVaultPda)).to.equal(0);
+    expect(await provider.connection.getAccountInfo(bountyPda)).to.be.null;
+    const after = await provider.connection.getBalance(submitter.publicKey);
+    expect(after - before).to.be.greaterThan(1 * LAMPORTS_PER_SOL - 1);
+  });
+
+  it("Should not let anyone else cancel a bounty", async () => {
+    const { bountyPda, escrowVaultPda } = await createOpenBounty();
+    try {
+      await program.methods
+        .cancelBounty()
+        .accountsPartial({
+          submitter: unauthorizedUser.publicKey,
+          bounty: bountyPda,
+          escrowVault: escrowVaultPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([unauthorizedUser])
+        .rpc();
+      expect.fail("Should have failed with InvalidSubmitterAccount");
+    } catch (err: any) {
+      expect(err.message).to.contain("InvalidSubmitterAccount");
+    }
+  });
+
+  it("Should not allow cancelling a bounty that has been claimed", async () => {
+    const { bountyPda, escrowVaultPda } = await createOpenBounty();
+    await claim(bountyPda);
+    try {
+      await program.methods
+        .cancelBounty()
+        .accountsPartial({
+          submitter: submitter.publicKey,
+          bounty: bountyPda,
+          escrowVault: escrowVaultPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([submitter])
+        .rpc();
+      expect.fail("Should have failed with BountyNotOpen");
+    } catch (err: any) {
+      expect(err.message).to.contain("BountyNotOpen");
+    }
+  });
+
+  it("Should let the resolver refund an abandoned claimed bounty", async () => {
+    const { bountyPda, escrowVaultPda } = await createOpenBounty();
+    await claim(bountyPda);
+    const [reputationPda] = getReputationPda(factChecker.publicKey);
+    const before = await provider.connection.getBalance(submitter.publicKey);
+
+    await program.methods
+      .resolveBounty({ rejected: {} })
+      .accountsPartial({
+        bounty: bountyPda,
+        escrowVault: escrowVaultPda,
+        submitter: submitter.publicKey,
+        factChecker: factChecker.publicKey,
+        reputation: reputationPda,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([resolver])
+      .rpc();
+
+    const bountyAccount = await program.account.bounty.fetch(bountyPda);
+    expect(JSON.stringify(bountyAccount.status)).to.contain("resolved");
+    expect(JSON.stringify(bountyAccount.resolution)).to.contain("rejected");
+    expect(await provider.connection.getBalance(escrowVaultPda)).to.equal(0);
+    const after = await provider.connection.getBalance(submitter.publicKey);
+    expect(after - before).to.be.greaterThan(1 * LAMPORTS_PER_SOL - 1);
+  });
+
+  it("Should not allow accepting a claimed bounty without a verdict", async () => {
+    const { bountyPda, escrowVaultPda } = await createOpenBounty();
+    await claim(bountyPda);
+    const [reputationPda] = getReputationPda(factChecker.publicKey);
+    try {
+      await program.methods
+        .resolveBounty({ accepted: {} })
+        .accountsPartial({
+          bounty: bountyPda,
+          escrowVault: escrowVaultPda,
+          submitter: submitter.publicKey,
+          factChecker: factChecker.publicKey,
+          reputation: reputationPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([resolver])
+        .rpc();
+      expect.fail("Should have failed with CannotAcceptWithoutVerdict");
+    } catch (err: any) {
+      expect(err.message).to.contain("CannotAcceptWithoutVerdict");
+    }
   });
 });

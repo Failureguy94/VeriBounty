@@ -55,6 +55,18 @@ const claimSchema = new Schema(
       trim: true,
       unique: true,
       index: true
+    },
+    // AI pre-screening result (filled in asynchronously after creation; optional)
+    preScreen: {
+      type: new Schema(
+        {
+          riskScore: { type: Number, min: 0, max: 100 },
+          reason: String,
+          isWorthFactChecking: Boolean
+        },
+        { _id: false }
+      ),
+      default: undefined
     }
   },
   {

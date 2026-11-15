@@ -10,8 +10,9 @@ const SEED_REPUTATION: &[u8] = b"reputation";
 
 pub const MAX_EVIDENCE_IPFS_HASH_LEN: usize = 128;
 
-
-pub const TRUSTED_RESOLVER: Pubkey = pubkey!("DmyZJ6yWcKdZS6MSQHtYJJbucxPKKc2Jdy2MgqdkvwwS");
+/// Only this wallet may resolve bounties. Its secret key must never be committed;
+/// keep it outside the repo (e.g. ~/.config/solana/veribounty-resolver.json).
+pub const TRUSTED_RESOLVER: Pubkey = pubkey!("GFEJ3s8AmahS1SPCsrSAetSc2e8VYAGXfVTJcxF45nKE");
 
 #[program]
 pub mod veri_bounty {
@@ -114,10 +115,16 @@ pub mod veri_bounty {
     pub fn resolve_bounty(ctx: Context<ResolveBounty>, resolution: Resolution) -> Result<()> {
         let bounty = &mut ctx.accounts.bounty;
 
-        require!(
-            bounty.status == BountyStatus::VerdictSubmitted,
-            ErrorCode::BountyNotReadyForResolution
-        );
+        // A verdict can be accepted or rejected. A claimed bounty with no verdict
+        // (abandoned by the fact-checker) can only be rejected, refunding the submitter.
+        match (bounty.status, resolution) {
+            (BountyStatus::VerdictSubmitted, _) => {}
+            (BountyStatus::Claimed, Resolution::Rejected) => {}
+            (BountyStatus::Claimed, Resolution::Accepted) => {
+                return err!(ErrorCode::CannotAcceptWithoutVerdict)
+            }
+            _ => return err!(ErrorCode::BountyNotReadyForResolution),
+        }
 
         let payout_lamports = bounty.stake_lamports;
         require_gte!(
@@ -180,6 +187,33 @@ pub mod veri_bounty {
             payout_lamports,
             fact_checker: bounty.fact_checker,
             submitter: bounty.submitter,
+        });
+
+        Ok(())
+    }
+
+    /// Submitter withdraws an unclaimed bounty: the full escrow is refunded and
+    /// the bounty account is closed (its rent also goes back to the submitter).
+    pub fn cancel_bounty(ctx: Context<CancelBounty>) -> Result<()> {
+        let bounty = &ctx.accounts.bounty;
+        require!(bounty.status == BountyStatus::Open, ErrorCode::BountyNotOpen);
+
+        let bounty_key = bounty.key();
+        let refunded_lamports = ctx.accounts.escrow_vault.lamports();
+
+        transfer_from_escrow(
+            ctx.accounts.escrow_vault.to_account_info(),
+            ctx.accounts.submitter.to_account_info(),
+            ctx.accounts.system_program.to_account_info(),
+            refunded_lamports,
+            &bounty_key,
+            bounty.vault_bump,
+        )?;
+
+        emit!(BountyCancelled {
+            bounty: bounty_key,
+            submitter: ctx.accounts.submitter.key(),
+            refunded_lamports,
         });
 
         Ok(())
@@ -354,6 +388,29 @@ pub struct ResolveBounty<'info> {
     pub system_program: Program<'info, System>,
 }
 
+#[derive(Accounts)]
+pub struct CancelBounty<'info> {
+    #[account(mut)]
+    pub submitter: Signer<'info>,
+    #[account(
+        mut,
+        close = submitter,
+        has_one = submitter @ ErrorCode::InvalidSubmitterAccount,
+        seeds = [SEED_BOUNTY, bounty.submitter.as_ref(), bounty.bounty_id.to_le_bytes().as_ref()],
+        bump = bounty.bump
+    )]
+    pub bounty: Account<'info, Bounty>,
+    #[account(
+        mut,
+        seeds = [SEED_ESCROW_VAULT, bounty.key().as_ref()],
+        bump = bounty.vault_bump
+    )]
+    pub escrow_vault: SystemAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+// NOTE: do not change the layout of `Bounty` without a migration — live devnet
+// accounts must keep deserializing.
 #[account]
 #[derive(InitSpace)]
 pub struct Bounty {
@@ -424,6 +481,13 @@ pub struct BountyResolved {
     pub submitter: Pubkey,
 }
 
+#[event]
+pub struct BountyCancelled {
+    pub bounty: Pubkey,
+    pub submitter: Pubkey,
+    pub refunded_lamports: u64,
+}
+
 #[error_code]
 pub enum ErrorCode {
     #[msg("Stake amount must be greater than zero")]
@@ -454,4 +518,6 @@ pub enum ErrorCode {
     ReputationAccountInvalid,
     #[msg("Math overflow")]
     MathOverflow,
+    #[msg("A bounty without a submitted verdict can only be rejected (refunded)")]
+    CannotAcceptWithoutVerdict,
 }
